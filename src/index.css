@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+@layer components {
+  .btn{
+    @apply bg-primary/400 border border-primary/400 text-white font-medium p-2 px-4 rounded-lg flex items-center gap-2 hover:opacity-80
+  }
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: "Montserrat", sans-serif;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.ant-tabs-card >.ant-tabs-nav .ant-tabs-tab {
+  border: 0px solid #E2D2F9 !important;
+  background: transparent !important;
+  border-bottom: 0px !important;
+}
+
+.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn{
+  color: #344054 !important;
+}
+
+.ant-tabs-nav{
+  margin: 0 !important;
+}
+
+
+
+.ant-select-selector{
+  border: 1px solid #E2D2F9 !important;
+}
+.ant-select-selection-item{
+  color: #8949E9;
+  font-weight: 600 !important;
+}
+
+
+.swiper-pagination {
+  position: static !important;
+}
+.swiper-pagination-bullet{
+  background-color: #E2D2F9 !important;
+  opacity: 1 !important;
+} 
+.swiper-pagination-bullet-active{
+  background-color: #5616B6 !important;
+}
+.custom-prev.swiper-button-disabled, .custom-next.swiper-button-disabled {
+  display: none; /* This hides the buttons when Swiper disables them */
+}
