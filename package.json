@@ -1,37 +1,46 @@
 {
-  "homepage": "https://xurgedigitallab.github.io/P2P-NFT-widget",
-  "name": "P2P-NFT-WIDGET",
+  "name": "p2p-nft-widget",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "v1",
     "@matrix-widget-toolkit/api": "^4.1.2",
+    "@matrix-widget-toolkit/mui": "^2.1.2",
     "@matrix-widget-toolkit/react": "^2.0.5",
+    "@mui/material": "^7.0.1",
+    "@reduxjs/toolkit": "^2.6.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^13.5.0",
     "antd": "^5.24.5",
+    "axios": "^1.8.4",
+    "buffer": "^6.0.3",
+    "framer-motion": "^12.6.3",
     "lucide-react": "^0.484.0",
     "matrix-js-sdk": "^37.2.0",
     "matrix-widget-api": "^1.13.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
+    "react-intersection-observer": "^9.16.0",
+    "react-lazyload": "^3.2.1",
+    "react-loading-skeleton": "^3.5.0",
+    "react-multi-carousel": "^2.8.5",
+    "react-router-dom": "^7.4.1",
     "react-scripts": "5.0.1",
+    "react-slick": "^0.30.3",
+    "react-swipeable-views": "^0.14.0",
     "swiper": "^11.2.6",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "xrpl": "^4.2.0"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
   },
   "browserslist": {
     "production": [
@@ -46,6 +55,15 @@
     ]
   },
   "devDependencies": {
+    "@eslint/css": "^0.7.0",
+    "@eslint/js": "^9.25.1",
+    "@eslint/json": "^0.12.0",
+    "@eslint/markdown": "^6.4.0",
+    "eslint": "^9.25.1",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.0.0",
+    "prettier": "3.1.0",
+    "prettier-eslint": "16.1.2",
     "tailwindcss": "^3.4.17"
   }
 }

@@ -1,16 +1,43 @@
-import './App.css';
-import Home from './pages/home';
-import { WidgetApiProvider } from "@matrix-widget-toolkit/react";
-import MatrixClientProvider from './components/MatrixClientProvider'; // Import the MatrixClientProvider
+import React, { Suspense } from "react";
+import PropTypes from "prop-types";
+import { MuiWidgetApiProvider } from "@matrix-widget-toolkit/mui";
+import { BrowserRouter } from "react-router-dom";
+import { WidgetParameter } from "@matrix-widget-toolkit/api";
+import MatrixClientProvider from "./components/MatrixClientProvider";
+import { ThemeProvider } from "./context/ThemeContext";
+import { useWidgetApi } from "@matrix-widget-toolkit/react";
 
-function App() {
-
+const ThemedMatrixClientProvider = () => {
+  const widgetApi = useWidgetApi();
+  
   return (
-    <MatrixClientProvider> {/* Wrap Home with MatrixClientProvider */}
-      <h1 className="text-2xl font-bold text-center my-4">NFT Marketplace</h1>
-      <Home />
-    </MatrixClientProvider>
+    <ThemeProvider widgetApi={widgetApi}>
+      <MatrixClientProvider />
+    </ThemeProvider>
+  );
+};
+
+function App({ widgetApiPromise }) {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<></>}>
+        <MuiWidgetApiProvider
+          widgetApiPromise={widgetApiPromise}
+          widgetRegistration={{
+            name: "P2P-NFT-Widget",
+            type: "com.example.clock",
+            data: { title: "P2P-NFT-Widget" },
+            requiredParameters: [WidgetParameter.DeviceId],
+          }}
+        >
+          <ThemedMatrixClientProvider />
+        </MuiWidgetApiProvider>
+      </Suspense>
+    </BrowserRouter>
   );
 }
+App.propTypes = {
+  widgetApiPromise: PropTypes.object.isRequired,
+};
 
 export default App;

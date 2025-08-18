@@ -1,0 +1,4 @@
+.bg-gray-900{
+    --tw-bg-opacity: 1 !important;
+    background-color: rgb(21 25 30 / var(--tw-bg-opacity, 1)) !important
+}

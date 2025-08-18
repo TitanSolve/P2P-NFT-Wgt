@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.carousel-container .react-multi-carousel-dot {
+  @apply w-2 h-2 rounded-full bg-gray-300 transition duration-300;
+}
+
+.carousel-container .react-multi-carousel-dot--active {
+  @apply bg-gray-800;
+}
+
+.carousel-container ul {
+  margin:auto;
+}
