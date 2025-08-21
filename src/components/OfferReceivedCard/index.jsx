@@ -53,7 +53,7 @@ const OfferReceivedCard = ({
   }, [sellOffers]);
 
   async function onAcceptOffer() {
-    console.log("Accpet clicked for item:", buyOffer);
+    console.log("Accept clicked for item:", buyOffer);
     console.log("SellOffer--->", madeOffers);
 
     setIsLoading(true);
@@ -540,7 +540,7 @@ const OfferReceivedCard = ({
                 className="dark:bg-green-600 dark:hover:bg-green-500"
                 // className="w-full sm:w-auto bg-red-500 text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-red-600 transition shadow-md text-center">
               >
-                Accpet
+                Accept
               </Button>
               <Button
                 type="primary"
