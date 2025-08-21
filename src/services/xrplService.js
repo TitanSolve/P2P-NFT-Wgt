@@ -1,4 +1,6 @@
-import { Client  } from 'xrpl';
+import {
+    Client
+} from 'xrpl';
 import API_URLS from '../config.js';
 
 const XRPL_NODE = 'wss://s.altnet.rippletest.net:51233'; // Using testnet, change to mainnet for production
@@ -21,7 +23,7 @@ const isValidAmount = (amount) => {
 
 const isValidOffer = (offer) => {
     if (!offer) return false;
-    
+
     // Check if the offer has valid amounts
     if (!isValidAmount(offer.taker_gets) || !isValidAmount(offer.taker_pays)) {
         return false;
@@ -49,7 +51,7 @@ export const getWalletOffers = async (walletAddress) => {
     try {
         // Create a new client
         const client = new Client(XRPL_NODE);
-        
+
         // Connect to the XRPL
         await client.connect();
 
@@ -58,9 +60,9 @@ export const getWalletOffers = async (walletAddress) => {
             command: 'ledger',
             ledger_index: 'validated'
         });
-        
+
         const currentLedgerIndex = ledgerResponse.result.ledger_index;
-        
+
         // Create the request with the current ledger index
         const request = {
             command: 'account_offers',
@@ -68,16 +70,16 @@ export const getWalletOffers = async (walletAddress) => {
             ledger_index: currentLedgerIndex,
             limit: 400 // Adjust based on your needs
         };
-        
+
         // Send the request
         const response = await client.request(request);
-        
+
         // Disconnect from the client
         await client.disconnect();
-        
+
         // Filter and process valid offers
         const validOffers = response.result.offers.filter(isValidOffer);
-        
+
         // Process and return the offers
         return {
             buyOffers: validOffers.filter(offer => offer.flags === 0),
@@ -103,9 +105,9 @@ export const getNFTOffers = async (address, options = {}) => {
     try {
         const {
             list = null, // null (default), 'counterOffers', 'privatelyOfferedToAddress'
-            nftoken = true, // Include NFT token data and metadata
-            offersValidate = true, // Include validation status
-            assets = true // Include asset URLs (requires Standard API plan)
+                nftoken = true, // Include NFT token data and metadata
+                offersValidate = true, // Include validation status
+                assets = true // Include asset URLs (requires Standard API plan)
         } = options;
 
         // Build query parameters
@@ -130,7 +132,16 @@ export const getNFTOffers = async (address, options = {}) => {
         }
 
         const data = await response.json();
-        return data;
+
+        // ✅ Filter only valid offers
+        const validOffers = data.nftOffers ? data.nftOffers.filter(o => o.valid === true) : [];
+
+        return {
+            ...data,
+            nftOffers: validOffers
+        };
+
+        // return data;
     } catch (error) {
         console.error('Error fetching NFT offers from Bithomp:', error);
         throw error;
@@ -179,9 +190,9 @@ export const getAllNFTOffers = async (address) => {
                 totalUserCreated: userCreatedOffers.nftOffers?.length || 0,
                 totalCounterOffers: counterOffers.nftOffers?.length || 0,
                 totalPrivateOffers: privateOffers.nftOffers?.length || 0,
-                totalOffers: (userCreatedOffers.nftOffers?.length || 0) + 
-                           (counterOffers.nftOffers?.length || 0) + 
-                           (privateOffers.nftOffers?.length || 0)
+                totalOffers: (userCreatedOffers.nftOffers?.length || 0) +
+                    (counterOffers.nftOffers?.length || 0) +
+                    (privateOffers.nftOffers?.length || 0)
             },
             owner: address,
             ownerDetails: userCreatedOffers.ownerDetails || null
@@ -236,4 +247,4 @@ export const getOffersByAmountRange = (offers, minAmount, maxAmount) => {
  */
 export const dropsToXrp = (drops) => {
     return parseInt(drops) / 1000000;
-}; 
+};
