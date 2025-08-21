@@ -330,7 +330,7 @@ const Offers = ({
   const fetchAllUsersOfers = async () => {
     try {
       console.log("🔍 Fetching NFT offers from Bithomp for:", myWalletAddress);
-      
+
       // Use the Bithomp API to get all NFT offers
       const data = await getAllNFTOffers(myWalletAddress);
       console.log("✅ NFT offers data from Bithomp:", data);
@@ -346,21 +346,21 @@ const Offers = ({
           console.log("✅ Direct transfer offer:", offer.offerIndex);
           return true;
         }
-        
+
         // Offer involves our broker wallet
-        if (brokerWalletAddress && 
-            (offer.destination === brokerWalletAddress || 
-             offer.account === brokerWalletAddress)) {
+        if (brokerWalletAddress &&
+          (offer.destination === brokerWalletAddress ||
+            offer.account === brokerWalletAddress)) {
           console.log("✅ Broker-involved offer:", offer.offerIndex);
           return true;
         }
-        
+
         // Offer made directly to us or by us (no broker)
         if (offer.destination === myWalletAddress || offer.account === myWalletAddress) {
           console.log("✅ Direct offer (no broker):", offer.offerIndex);
           return true;
         }
-        
+
         console.log("❌ Filtered out brokered offer by another marketplace:", offer.offerIndex, {
           destination: offer.destination,
           account: offer.account,
@@ -372,7 +372,7 @@ const Offers = ({
       // Build NFT maps for categorization
       const nftMapById = new Map();
       const walletNftMap = {};
-      
+
       myNftData.forEach((member) => {
         member.groupedNfts.forEach((group) => {
           group.nfts.forEach((nft) => {
@@ -393,7 +393,7 @@ const Offers = ({
       // Process user created offers (offers we made) - filter for relevant offers only
       if (data.userCreatedOffers && data.userCreatedOffers.length > 0) {
         console.log(`📤 Processing ${data.userCreatedOffers.length} user created offers...`);
-        
+
         data.userCreatedOffers.filter(isRelevantOffer).forEach((offer) => {
           const nftData = offer.nftoken || nftMapById.get(offer.nftokenID);
           madeOffers_.push({
@@ -423,10 +423,10 @@ const Offers = ({
       // Process counter offers (offers made on our NFTs) - filter for relevant offers only
       if (data.counterOffers && data.counterOffers.length > 0) {
         console.log(`📥 Processing ${data.counterOffers.length} counter offers...`);
-        
+
         data.counterOffers.filter(isRelevantOffer).forEach((offer) => {
           const nftData = offer.nftoken || nftMapById.get(offer.nftokenID);
-          
+
           // Only include if we own this NFT
           if (walletNftMap[myWalletAddress]?.has(offer.nftokenID)) {
             receivedOffers_.push({
@@ -457,10 +457,10 @@ const Offers = ({
       // Process private offers (offers specifically made to us) - filter for relevant offers only
       if (data.privateOffers && data.privateOffers.length > 0) {
         console.log(`🔒 Processing ${data.privateOffers.length} private offers...`);
-        
+
         data.privateOffers.filter(isRelevantOffer).forEach((offer) => {
           const nftData = offer.nftoken || nftMapById.get(offer.nftokenID);
-          
+
           // Check if this is truly an offer to us
           if (offer.destination === myWalletAddress) {
             receivedOffers_.push({
@@ -495,28 +495,30 @@ const Offers = ({
         originalUserCreated: data.userCreatedOffers?.length || 0,
         filteredUserCreated: madeOffers_.length,
         originalCounterOffers: data.counterOffers?.length || 0,
-        filteredCounterOffers: receivedOffers_.filter(offer => 
+        filteredCounterOffers: receivedOffers_.filter(offer =>
           data.counterOffers?.some(co => co.offerIndex === offer.offer.offerId)
         ).length,
         originalPrivateOffers: data.privateOffers?.length || 0,
-        filteredPrivateOffers: receivedOffers_.filter(offer => 
+        filteredPrivateOffers: receivedOffers_.filter(offer =>
           data.privateOffers?.some(po => po.offerIndex === offer.offer.offerId)
         ).length
       });
 
       setMadeOffers(madeOffers_);
       setReceivedOffers(receivedOffers_);
-      
+
     } catch (error) {
       console.error("❌ Error fetching NFT offers:", error);
     }
-  };  const refreshOffers = async () => {
+  }; 
+  
+  const refreshOffers = async () => {
     console.log("Offers->refreshOffers", myWalletAddress);
     if (!myWalletAddress) {
       console.warn("⚠️ No wallet address available for refreshing offers");
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -549,7 +551,7 @@ const Offers = ({
                 </p>
               </div>
             </div>
-            
+
             <button
               onClick={refreshOffers}
               className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-700 justify-center dark:text-gray-200 w-10 h-10 rounded-xl font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200/50 dark:border-gray-700/50"

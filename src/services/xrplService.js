@@ -151,6 +151,7 @@ export const getAllNFTOffers = async (address) => {
             offersValidate: true,
             assets: true
         });
+        console.log('User Created Offers:', userCreatedOffers);
 
         // Fetch counter offers (offers made on the user's NFTs)
         const counterOffers = await getNFTOffers(address, {
@@ -159,6 +160,7 @@ export const getAllNFTOffers = async (address) => {
             offersValidate: true,
             assets: true
         });
+        console.log('Counter Offers:', counterOffers);
 
         // Fetch privately offered to address (brokers, private offers, NFT transfers)
         const privateOffers = await getNFTOffers(address, {
@@ -167,6 +169,7 @@ export const getAllNFTOffers = async (address) => {
             offersValidate: true,
             assets: true
         });
+        console.log('Private Offers:', privateOffers);
 
         return {
             userCreatedOffers: userCreatedOffers.nftOffers || [],
