@@ -98,7 +98,6 @@ const OfferReceivedCard = ({
       if (typeof buyOffer.offer.amount === "string") {
         strAmount = (
           (buyOffer.offer.amount * 1 - 12) /
-          1.01 /
           1000000
         ).toString();
         strCurrency = "XRP";
@@ -169,7 +168,6 @@ const OfferReceivedCard = ({
       let sellAmount = "0";
       sellAmount = (
         (buyOffer.offer.amount * 1 - 12) /
-        1.01 /
         1000000
       ).toString();
 
@@ -326,7 +324,6 @@ const OfferReceivedCard = ({
         if (typeof buyOffer.offer.amount === "string") {
           strAmount = (
             (buyOffer.offer.amount * 1 - 12) /
-            1.01 /
             1000000
           ).toString();
           strCurrency = "XRP";
@@ -465,7 +462,7 @@ const OfferReceivedCard = ({
               </p>
               <p className="text-lg font-medium text-blue-600 dark:text-blue-400">
                 Amount:{" "}
-                {((buyOffer.offer.amount * 1 - 12) / 1.01 / 1000000).toFixed(6)}
+                {((buyOffer.offer.amount * 1 - 12) / 1000000).toFixed(6)}
               </p>
               <p className="text-sm px-3 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 w-fit mx-auto md:mx-0 border border-yellow-200 dark:border-yellow-800">
                 Received Offer

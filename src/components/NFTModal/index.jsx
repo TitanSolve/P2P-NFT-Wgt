@@ -200,11 +200,11 @@ const NFTModal = ({
 
     let offerAmount;
     if (currency === "XRP") {
-      offerAmount = (parseFloat(amount) * 1.01 + 0.000012).toFixed(6);
+      offerAmount = (parseFloat(amount) * 1 + 0.000012).toFixed(6);
     } else {
       offerAmount = {
         currency: currency,
-        value: (parseFloat(amount) * 1.01).toString(),
+        value: (parseFloat(amount) * 1).toString(),
       };
     }
 
