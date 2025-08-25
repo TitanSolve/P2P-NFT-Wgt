@@ -213,7 +213,7 @@ const MatrixClientProvider = () => {
         .filter(url => url && url.trim() !== '');
       
       if (imageUrls.length > 0) {
-        console.log(`🖼️ Preloading ${imageUrls.length} NFT images for collection ${collectionName}`);
+        // console.log(`🖼️ Preloading ${imageUrls.length} NFT images for collection ${collectionName}`);
         imageCache.preloadImages(imageUrls).catch(error => {
           console.warn('Failed to preload some images:', error);
         });
