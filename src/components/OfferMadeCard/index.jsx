@@ -51,7 +51,7 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
         setMessageBoxType("error");
         setMessageBoxText(
           "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
-        );
+        );3
         setIsMessageBoxVisible(true);
         return;
       }

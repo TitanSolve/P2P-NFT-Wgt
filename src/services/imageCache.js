@@ -37,19 +37,19 @@ class ImageCacheService {
 
     // For local images (like import paths), return them directly without caching
     if (imageUrl.startsWith('/') || imageUrl.startsWith('data:') || imageUrl.includes('static/media/')) {
-      console.log(`📁 Local image detected, using directly: ${imageUrl}`);
+      // console.log(`📁 Local image detected, using directly: ${imageUrl}`);
       return imageUrl;
     }
 
     // For CDN URLs that might have CORS issues, use direct URL instead of caching
     if (imageUrl.includes('cdn.bithomp.com') || imageUrl.includes('gateway.pinata.cloud')) {
-      console.log(`🌐 CDN image detected, using directly: ${imageUrl}`);
+      // console.log(`🌐 CDN image detected, using directly: ${imageUrl}`);
       return imageUrl;
     }
 
     // If the image URL is the same as fallback, return it directly
     if (imageUrl === fallbackUrl) {
-      console.log(`🔄 Image URL same as fallback, using directly: ${imageUrl}`);
+      // console.log(`🔄 Image URL same as fallback, using directly: ${imageUrl}`);
       return imageUrl;
     }
 
@@ -57,18 +57,18 @@ class ImageCacheService {
     if (this.cache.has(imageUrl)) {
       this.updateAccessOrder(imageUrl);
       const cached = this.cache.get(imageUrl);
-      console.log(`✅ Image cache hit: ${imageUrl}`);
+      // console.log(`✅ Image cache hit: ${imageUrl}`);
       return cached;
     }
 
     // Check if already loading
     if (this.loadingPromises.has(imageUrl)) {
-      console.log(`⏳ Image already loading: ${imageUrl}`);
+      // console.log(`⏳ Image already loading: ${imageUrl}`);
       return this.loadingPromises.get(imageUrl);
     }
 
     // Start loading and caching
-    console.log(`🔄 Starting to cache image: ${imageUrl}`);
+    // console.log(`🔄 Starting to cache image: ${imageUrl}`);
     const loadingPromise = this.loadAndCacheImage(imageUrl, fallbackUrl);
     this.loadingPromises.set(imageUrl, loadingPromise);
 

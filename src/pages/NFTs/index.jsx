@@ -54,7 +54,7 @@ const NFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, widgetApi,
                              group.collection;
         const collectionName = group.collection;
         
-        console.log(`🏷️ Processing collection: ${collectionName} with key: ${collectionKey} (issuer: ${group.issuer}, taxon: ${group.nftokenTaxon})`);
+        // console.log(`🏷️ Processing collection: ${collectionName} with key: ${collectionKey} (issuer: ${group.issuer}, taxon: ${group.nftokenTaxon})`);
         
         if (!collections[collectionKey]) {
           collections[collectionKey] = {
@@ -128,10 +128,10 @@ const NFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, widgetApi,
   const collectionImages = useMemo(() => {
     const images = collectionsData
       .map(collection => {
-        console.log(`🔍 Extracting image for collection ${collection.name}:`, {
-          sampleImage: collection.sampleImage,
-          collection: collection
-        });
+        // console.log(`🔍 Extracting image for collection ${collection.name}:`, {
+        //   sampleImage: collection.sampleImage,
+        //   collection: collection
+        // });
         return collection.sampleImage;
       })
       .filter(image => {
@@ -140,11 +140,11 @@ const NFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, widgetApi,
                        image !== 'undefined' && 
                        image !== 'null' && 
                        image !== nft_pic;
-        console.log(`🖼️ Image validation:`, { image, isValid });
+        // console.log(`🖼️ Image validation:`, { image, isValid });
         return isValid;
       });
     
-    console.log(`📊 Final collection images for preload:`, images);
+    // console.log(`📊 Final collection images for preload:`, images);
     return images;
   }, [collectionsData]);
 
