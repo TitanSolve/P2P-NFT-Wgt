@@ -313,7 +313,7 @@ const MatrixClientProvider = () => {
           .filter(url => url && url.trim() !== '' && url !== 'undefined' && url !== 'null');
 
         if (sampleImages.length > 0) {
-          console.log(`🖼️ Preloading ${sampleImages.length} collection sample images:`, sampleImages);
+          // console.log(`🖼️ Preloading ${sampleImages.length} collection sample images:`, sampleImages);
           imageCache.preloadImages(sampleImages).catch(error => {
             console.warn('Failed to preload collection sample images:', error);
           });
