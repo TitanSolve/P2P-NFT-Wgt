@@ -20,7 +20,6 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
     const requestBody = {
       account: myWalletAddress,
       offerId: transfer.offer.offerId,
-      buyOrSell: 0,
     };
     console.log("requestBody:", requestBody);
     try {

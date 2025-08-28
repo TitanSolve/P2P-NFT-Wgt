@@ -224,7 +224,7 @@ const OfferReceivedCard = ({
     setIsLoading(true);
     const requestBody = {
       owner: myWalletAddress,
-      account: buyOffer.offer.offerOwner,
+      // account: buyOffer.offer.offerOwner,
       offerId: buyOffer.offer.offerId,
     };
     try {
