@@ -22,6 +22,32 @@ import LoadingOverlayForCard from "../LoadingOverlayForCard";
 import { useCachedImage } from "../../hooks/useCachedImage";
 import nft_pic from "../../assets/nft.png";
 
+// Reusable dark-mode styles for MUI outlined inputs (Select/TextField)
+const darkFieldSx = {
+  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.82)" },
+  "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
+  "& .MuiOutlinedInput-input": { color: "#fff" },
+  "& .MuiSvgIcon-root": { color: "#fff" }, // dropdown arrow
+  "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
+  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.55)" },
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#60A5FA", // tailwind blue-400
+  },
+};
+
+const darkMenuProps = {
+  PaperProps: {
+    sx: {
+      bgcolor: "#111827", // gray-900
+      color: "#fff",
+      "& .MuiMenuItem-root.Mui-selected": { bgcolor: "#1F2937" }, // gray-800
+      "& .MuiMenuItem-root:hover": { bgcolor: "#1F2937" },
+      "& .MuiDivider-root": { bgcolor: "rgba(255,255,255,0.12)" },
+    },
+  },
+};
+
+
 const isPositive = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) && n > 0;
@@ -172,9 +198,9 @@ const NFTModal = ({
       currency === "XRP"
         ? amount
         : {
-            currency,
-            value: String(parseFloat(amount)),
-          };
+          currency,
+          value: String(parseFloat(amount)),
+        };
 
     const payload = {
       nft: nft.nftokenID,
@@ -332,11 +358,10 @@ const NFTModal = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
-                    activeTab === "details"
-                      ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
-                      : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                  }`}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${activeTab === "details"
+                    ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
+                    : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    }`}
                   aria-pressed={activeTab === "details"}
                 >
                   <Package size={16} className="inline mr-2" />
@@ -348,11 +373,10 @@ const NFTModal = ({
                     <button
                       type="button"
                       onClick={() => setActiveTab("transfer")}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
-                        activeTab === "transfer"
-                          ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
-                          : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                      }`}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${activeTab === "transfer"
+                        ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
+                        : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                        }`}
                       aria-pressed={activeTab === "transfer"}
                     >
                       <Gift size={16} className="inline mr-2" />
@@ -361,11 +385,10 @@ const NFTModal = ({
                     <button
                       type="button"
                       onClick={() => setActiveTab("sell")}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
-                        activeTab === "sell"
-                          ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
-                          : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                      }`}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${activeTab === "sell"
+                        ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
+                        : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                        }`}
                       aria-pressed={activeTab === "sell"}
                     >
                       <Tag size={16} className="inline mr-2" />
@@ -376,11 +399,10 @@ const NFTModal = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab("buy")}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
-                      activeTab === "buy"
-                        ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
-                        : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                    }`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${activeTab === "buy"
+                      ? "bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-200 shadow-sm"
+                      : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                      }`}
                     aria-pressed={activeTab === "buy"}
                   >
                     <Gavel size={16} className="inline mr-2" />
@@ -405,9 +427,8 @@ const NFTModal = ({
                 <img
                   src={cachedImageSrc}
                   alt={nft.metadata?.name || "NFT"}
-                  className={`w-full h-72 lg:h-80 object-cover transition-opacity duration-500 ${
-                    isLoaded ? "opacity-100" : "opacity-0"
-                  }`}
+                  className={`w-full h-72 lg:h-80 object-cover transition-opacity duration-500 ${isLoaded ? "opacity-100" : "opacity-0"
+                    }`}
                   draggable={false}
                 />
                 <div className="absolute top-3 right-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-semibold text-gray-900 dark:text-white shadow">
@@ -537,13 +558,31 @@ const NFTModal = ({
 
                     <FormControlLabel
                       control={
-                        <Switch checked={isListing} onChange={(e) => setIsListing(e.target.checked)} />
+                        <Switch
+                          checked={isListing}
+                          onChange={(e) => setIsListing(e.target.checked)}
+                          sx={{
+                            // thumb
+                            "& .MuiSwitch-switchBase.Mui-checked": { color: "#60A5FA" },           // blue-400
+                            "& .MuiSwitch-switchBase": { color: "rgba(255,255,255,0.75)" },
+                            // track
+                            "& .MuiSwitch-track": { backgroundColor: "rgba(255,255,255,0.25)" },
+                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                              backgroundColor: "#2563EB", // blue-600
+                            },
+                          }}
+                        />
                       }
                       label="Public listing (available to anyone)"
+                      sx={{
+                        color: "#fff",
+                        "& .MuiFormControlLabel-label": { color: "#fff" },
+                      }}
                     />
 
+
                     {!isListing && (
-                      <FormControl fullWidth>
+                      <FormControl fullWidth sx={darkFieldSx}>
                         <InputLabel id="buyer-label">Select Buyer</InputLabel>
                         <Select
                           labelId="buyer-label"
@@ -551,10 +590,9 @@ const NFTModal = ({
                           value={selectedUser}
                           label="Select Buyer"
                           onChange={(e) => setSelectedUser(e.target.value)}
+                          MenuProps={darkMenuProps}
                         >
-                          <MenuItem value="all" disabled>
-                            Choose a member…
-                          </MenuItem>
+                          <MenuItem value="all" disabled>Choose a member…</MenuItem>
                           {membersList
                             .filter((m) => m.name !== wgtParameters.displayName)
                             .map((m) => (
@@ -564,6 +602,7 @@ const NFTModal = ({
                             ))}
                         </Select>
                       </FormControl>
+
                     )}
 
                     <TextField
@@ -575,16 +614,21 @@ const NFTModal = ({
                       onKeyDown={(e) => e.key === "Enter" && canSubmitSell && handleSellOffer()}
                       placeholder="Enter price"
                       inputProps={{ min: 0, step: "any", inputMode: "decimal" }}
-                      error={amount !== "" && !isPositive(amount)}
-                      helperText={
-                        amount !== "" && !isPositive(amount) ? "Enter a positive number." : " "
-                      }
+                      error={amount !== "" && !(parseFloat(amount) > 0)}
+                      helperText={amount !== "" && !(parseFloat(amount) > 0) ? "Enter a positive number." : " "}
                       InputProps={{
                         endAdornment: (
-                          <InputAdornment position="end">{currency}</InputAdornment>
+                          <InputAdornment position="end">
+                            <span style={{ color: "#fff" }}>{currency}</span>
+                          </InputAdornment>
                         ),
                       }}
+                      sx={{
+                        ...darkFieldSx,
+                        "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.7)" },
+                      }}
                     />
+
 
                     <Button
                       type="button"
@@ -620,16 +664,21 @@ const NFTModal = ({
                       onKeyDown={(e) => e.key === "Enter" && canSubmitBuy && handleBuyOffer()}
                       placeholder="Enter your offer"
                       inputProps={{ min: 0, step: "any", inputMode: "decimal" }}
-                      error={amount !== "" && !isPositive(amount)}
-                      helperText={
-                        amount !== "" && !isPositive(amount) ? "Enter a positive number." : " "
-                      }
+                      error={amount !== "" && !(parseFloat(amount) > 0)}
+                      helperText={amount !== "" && !(parseFloat(amount) > 0) ? "Enter a positive number." : " "}
                       InputProps={{
                         endAdornment: (
-                          <InputAdornment position="end">{currency}</InputAdornment>
+                          <InputAdornment position="end">
+                            <span style={{ color: "#fff" }}>{currency}</span>
+                          </InputAdornment>
                         ),
                       }}
+                      sx={{
+                        ...darkFieldSx,
+                        "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.7)" },
+                      }}
                     />
+
 
                     <Button
                       type="button"
