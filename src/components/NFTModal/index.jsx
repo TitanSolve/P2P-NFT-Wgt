@@ -37,6 +37,8 @@ const NFTModal = ({
   const [messageBoxType, setMessageBoxType] = useState("success");
   const [messageBoxText, setMessageBoxText] = useState("");
 
+  const [description, setDescription] = useState("");
+
   // Available currencies (you might want to get this from user's trust lines)
   const availableCurrencies = ['XRP'];
 
@@ -46,6 +48,12 @@ const NFTModal = ({
     nft_pic,
     { eager: true }
   );
+
+  useEffect(() => {
+    if (nft.metadata) {
+      setDescription(descFromMeta(nft.metadata));
+    }
+  }, [nft]);
 
   useEffect(() => {
     if (websocketUrl) {
@@ -272,8 +280,6 @@ const NFTModal = ({
       )?.value;
     return found ? String(found) : "";
   };
-
-  const description = descFromMeta(nft.metadata);
 
   if (!nft) return null;
 
