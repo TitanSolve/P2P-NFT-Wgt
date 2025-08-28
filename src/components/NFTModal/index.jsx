@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Modal,
   Box,
@@ -94,6 +94,25 @@ const NFTModal = ({
   const [messageBoxType, setMessageBoxType] = useState("success");
   const [messageBoxText, setMessageBoxText] = useState("");
 
+  const wsRef = useRef(null);
+
+  const safeParse = (v) => {
+    try { return JSON.parse(v); } catch { return v; }
+  };
+
+  const closeQrModal = (statusText, toastText, toastType = "error") => {
+    setTransactionStatus(statusText || "");
+    setIsQrModalVisible(false);
+    try { wsRef.current?.close(); } catch { }
+    wsRef.current = null;
+    if (toastText) {
+      setMessageBoxType(toastType);
+      setMessageBoxText(toastText);
+      setIsMessageBoxVisible(true);
+    }
+  };
+
+
   const availableCurrencies = ["XRP"]; // extend if needed
 
   const { src: cachedImageSrc, isLoaded } = useCachedImage(
@@ -106,25 +125,62 @@ const NFTModal = ({
 
   useEffect(() => {
     if (!websocketUrl) return;
+
+    // Close any previous socket
+    try { wsRef.current?.close(); } catch { }
     const ws = new WebSocket(websocketUrl);
+    wsRef.current = ws;
+
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data || "{}");
-      if (data.signed) {
-        setTransactionStatus("Transaction signed");
-        setIsQrModalVisible(false);
-        setMessageBoxType("success");
-        setMessageBoxText("Transaction completed successfully!");
-        setIsMessageBoxVisible(true);
-        onAction?.();
-      } else if (data.rejected) {
-        setTransactionStatus("Transaction rejected");
-        setMessageBoxType("error");
-        setMessageBoxText("Transaction was rejected.");
-        setIsMessageBoxVisible(true);
+      const msg = safeParse(event.data || "");
+      console.log("WebSocket message received:", msg);
+
+      // Some gateways send plain strings for simple states
+      if (typeof msg === "string") {
+        if (/declin|reject|cancel|close|abort|deny|expire/i.test(msg)) {
+          closeQrModal("Transaction cancelled", "Transaction was cancelled/declined.");
+        }
+        return;
+      }
+
+      // Xaman/Xumm resolved payload:
+      // { signed: true|false, reason?: 'DECLINED'|'EXPIRED'..., ... }
+      if (msg?.signed === true) {
+        closeQrModal("Transaction signed", "Transaction completed successfully!", "success");
+        onAction?.(); // refresh data if provided
+        return;
+      }
+      if (msg?.signed === false) {
+        const why = (msg?.reason || "Declined").toString().toLowerCase();
+        closeQrModal("Transaction declined", `Transaction was ${why}.`);
+        return;
+      }
+
+      // Extra guards for alternate shapes
+      if (msg?.cancelled || msg?.canceled || msg?.expired) {
+        closeQrModal("Transaction cancelled", "Transaction was cancelled/expired.");
+        return;
       }
     };
-    return () => ws.close();
-  }, [websocketUrl, onAction]);
+
+    ws.onerror = () => {
+      // Treat errors as a cancelled flow but don't spam
+      closeQrModal("Connection error", "Wallet connection error. Please try again.");
+    };
+
+    ws.onclose = () => {
+      // If the QR modal is still open with no resolution, close gracefully
+      if (isQrModalVisible) {
+        closeQrModal("Connection closed", "Wallet connection closed.");
+      }
+    };
+
+    return () => {
+      try { ws.close(); } catch { }
+      wsRef.current = null;
+    };
+  }, [websocketUrl, isQrModalVisible, onAction]);
+
 
   const getMxidLocalPart = (mxid) =>
     mxid?.includes(":") ? mxid.split(":")[0]?.replace("@", "") : undefined;
@@ -710,10 +766,11 @@ const NFTModal = ({
 
       <TransactionModal
         isOpen={isQrModalVisible}
-        onClose={() => setIsQrModalVisible(false)}
+        onClose={() => closeQrModal("Cancelled", "Transaction flow cancelled.")}
         qrCodeUrl={qrCodeUrl}
         transactionStatus={transactionStatus}
       />
+
 
       <NFTMessageBox
         isOpen={isMessageBoxVisible}
