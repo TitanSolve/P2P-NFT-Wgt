@@ -50,7 +50,7 @@ const NFTModal = ({
   );
 
   useEffect(() => {
-    if (nft.metadata) {
+    if (nft?.metadata) {
       setDescription(descFromMeta(nft.metadata));
     }
   }, [nft]);
