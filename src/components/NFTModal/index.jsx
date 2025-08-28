@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Box, Button, TextField, MenuItem, FormControl, InputLabel, Select, Switch, FormControlLabel } from "@mui/material";
-import { User, Package, Tag, ExternalLink, X, Send, ShoppingCart, Gavel, Gift } from "lucide-react";
+import { Modal, Box, Button, TextField, MenuItem, FormControl, InputLabel, Select, Switch, FormControlLabel, InputAdornment, } from "@mui/material";
+import { User, Package, Tag, X, Send, Gavel, Gift } from "lucide-react";
 import API_URLS from "../../config";
 import TransactionModal from "../TransactionModal";
 import NFTMessageBox from "../NFTMessageBox";
@@ -263,290 +263,320 @@ const NFTModal = ({
 
   return (
     <>
-      <Modal open={isOpen} onClose={handleClose}>
-        <Box className="fixed inset-0 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-            {isLoading && <LoadingOverlayForCard />}
-            
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {nft.metadata?.name || 'Unnamed NFT'}
-              </h2>
-              <button
-                onClick={handleClose}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <X size={20} className="text-gray-500" />
-              </button>
-            </div>
+      <Modal
+        open={isOpen}
+        onClose={handleClose}
+        keepMounted
+        slotProps={{
+          backdrop: { sx: { backgroundColor: "rgba(0,0,0,0.6)" } },
+        }}
+      >
+        {/* IMPORTANT: don't use `fixed inset-0 z-50` here, let Modal handle stacking */}
+        <Box
+          // Center the dialog in the viewport the MUI way (no stacking conflicts)
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "min(90vw, 48rem)",
+            maxHeight: "90vh",
+            bgcolor: "background.paper",
+            borderRadius: 3,
+            boxShadow: 24,
+            overflow: "hidden",
+          }}
+          className="dark:bg-gray-800"
+        >
+          {isLoading && (
+            // If you want to block clicks while loading, keep it; if not, add `pointer-events-none`
+            <LoadingOverlayForCard />
+          )}
 
-            {/* Content */}
-            <div className="flex flex-col lg:flex-row max-h-[calc(90vh-120px)] overflow-hidden">
-              {/* Left side - Image */}
-              <div className="lg:w-1/2 p-6">
-                <div className="relative bg-gray-100 dark:bg-gray-700 rounded-xl overflow-hidden">
-                  <img
-                    src={cachedImageSrc}
-                    alt={nft.metadata?.name || 'NFT'}
-                    className={`w-full h-64 lg:h-80 object-cover transition-opacity duration-500 ${
-                      isLoaded ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  />
-                  {/* Owner badge */}
-                  <div className="absolute top-3 right-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-gray-900 dark:text-white shadow-lg">
-                    {nft.ownerName}
-                  </div>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              {nft.metadata?.name || "Unnamed NFT"}
+            </h2>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex flex-col lg:flex-row max-h-[calc(90vh-120px)] overflow-hidden">
+            {/* Left side - Image */}
+            <div className="lg:w-1/2 p-6">
+              <div className="relative bg-gray-100 dark:bg-gray-700 rounded-xl overflow-hidden">
+                <img
+                  src={cachedImageSrc}
+                  alt={nft.metadata?.name || "NFT"}
+                  className={`w-full h-64 lg:h-80 object-cover transition-opacity duration-500 ${
+                    isLoaded ? "opacity-100" : "opacity-0"
+                  }`}
+                  draggable={false}
+                />
+                {/* Owner badge */}
+                <div className="absolute top-3 right-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-gray-900 dark:text-white shadow-lg">
+                  {nft.ownerName}
                 </div>
               </div>
+            </div>
 
-              {/* Right side - Details and Actions */}
-              <div className="lg:w-1/2 flex flex-col">
-                {/* Tabs */}
-                <div className="flex border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={() => setActiveTab('details')}
-                    className={`px-4 py-3 text-sm font-medium transition-colors ${
-                      activeTab === 'details'
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                    }`}
-                  >
-                    <Package size={16} className="inline mr-2" />
-                    Details
-                  </button>
-                  {isOwner ? (
-                    <>
-                      <button
-                        onClick={() => setActiveTab('transfer')}
-                        className={`px-4 py-3 text-sm font-medium transition-colors ${
-                          activeTab === 'transfer'
-                            ? 'text-blue-600 border-b-2 border-blue-600'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                        }`}
-                      >
-                        <Gift size={16} className="inline mr-2" />
-                        Transfer
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('sell')}
-                        className={`px-4 py-3 text-sm font-medium transition-colors ${
-                          activeTab === 'sell'
-                            ? 'text-blue-600 border-b-2 border-blue-600'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                        }`}
-                      >
-                        <Tag size={16} className="inline mr-2" />
-                        Sell
-                      </button>
-                    </>
-                  ) : (
+            {/* Right side - Details and Actions */}
+            <div className="lg:w-1/2 flex flex-col">
+              {/* Tabs */}
+              <div className="flex border-b border-gray-200 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("details")}
+                  className={`px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === "details"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                  }`}
+                  aria-selected={activeTab === "details"}
+                >
+                  <Package size={16} className="inline mr-2" />
+                  Details
+                </button>
+
+                {isOwner ? (
+                  <>
                     <button
-                      onClick={() => setActiveTab('buy')}
+                      type="button"
+                      onClick={() => setActiveTab("transfer")}
                       className={`px-4 py-3 text-sm font-medium transition-colors ${
-                        activeTab === 'buy'
-                          ? 'text-blue-600 border-b-2 border-blue-600'
-                          : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                        activeTab === "transfer"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
                       }`}
+                      aria-selected={activeTab === "transfer"}
                     >
-                      <Gavel size={16} className="inline mr-2" />
-                      Make Offer
+                      <Gift size={16} className="inline mr-2" />
+                      Transfer
                     </button>
-                  )}
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("sell")}
+                      className={`px-4 py-3 text-sm font-medium transition-colors ${
+                        activeTab === "sell"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                      }`}
+                      aria-selected={activeTab === "sell"}
+                    >
+                      <Tag size={16} className="inline mr-2" />
+                      Sell
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("buy")}
+                    className={`px-4 py-3 text-sm font-medium transition-colors ${
+                      activeTab === "buy"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                    }`}
+                    aria-selected={activeTab === "buy"}
+                  >
+                    <Gavel size={16} className="inline mr-2" />
+                    Make Offer
+                  </button>
+                )}
+              </div>
 
-                {/* Tab Content */}
-                <div className="flex-1 p-6 overflow-y-auto">
-                  {activeTab === 'details' && (
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                          NFT Information
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Collection:</span>
-                            <span className="text-gray-900 dark:text-white font-medium">
-                              {nft.collectionName || 'Unknown Collection'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Owner:</span>
-                            <span className="text-gray-900 dark:text-white font-medium flex items-center gap-2">
-                              <User size={14} />
-                              {nft.ownerName}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Token ID:</span>
-                            <span className="text-gray-900 dark:text-white font-mono text-xs break-all">
-                              {nft.nftokenID}
-                            </span>
-                          </div>
-                          {nft.metadata?.description && (
-                            <div>
-                              <span className="text-gray-600 dark:text-gray-400 block mb-1">Description:</span>
-                              <p className="text-gray-900 dark:text-white text-sm">
-                                {nft.metadata.description}
-                              </p>
-                            </div>
-                          )}
+              {/* Tab Content */}
+              <div className="flex-1 p-6 overflow-y-auto">
+                {activeTab === "details" && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        NFT Information
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Collection:</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {nft.collectionName || "Unknown Collection"}
+                          </span>
                         </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Owner:</span>
+                          <span className="text-gray-900 dark:text-white font-medium flex items-center gap-2">
+                            <User size={14} />
+                            {nft.ownerName}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Token ID:</span>
+                          <span className="text-gray-900 dark:text-white font-mono text-xs break-all">
+                            {nft.nftokenID}
+                          </span>
+                        </div>
+                        {nft.metadata?.description && (
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400 block mb-1">
+                              Description:
+                            </span>
+                            <p className="text-gray-900 dark:text-white text-sm">
+                              {nft.metadata.description}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {activeTab === 'transfer' && isOwner && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Transfer NFT
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm">
-                        Send this NFT to another member for free.
-                      </p>
-                      
+                {activeTab === "transfer" && isOwner && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Transfer NFT
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                      Send this NFT to another member for free.
+                    </p>
+
+                    <FormControl fullWidth>
+                      <InputLabel>Select Recipient</InputLabel>
+                      <Select
+                        value={selectedUser}
+                        label="Select Recipient"
+                        onChange={(e) => setSelectedUser(e.target.value)}
+                      >
+                        <MenuItem value="all" disabled>
+                          Choose a member...
+                        </MenuItem>
+                        {membersList
+                          .filter((m) => m.name !== wgtParameters.displayName)
+                          .map((m) => (
+                            <MenuItem key={m.name} value={m.name}>
+                              {m.name}
+                            </MenuItem>
+                          ))}
+                      </Select>
+                    </FormControl>
+
+                    <Button
+                      type="button"
+                      fullWidth
+                      variant="contained"
+                      color="success"
+                      startIcon={<Send size={16} />}
+                      onClick={handleTransfer}
+                      disabled={selectedUser === "all"}
+                    >
+                      Transfer NFT
+                    </Button>
+                  </div>
+                )}
+
+                {activeTab === "sell" && isOwner && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sell NFT</h3>
+
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={isListing}
+                          onChange={(e) => setIsListing(e.target.checked)}
+                        />
+                      }
+                      label="Create public listing (available to anyone)"
+                    />
+
+                    {!isListing && (
                       <FormControl fullWidth>
-                        <InputLabel>Select Recipient</InputLabel>
+                        <InputLabel>Select Buyer</InputLabel>
                         <Select
                           value={selectedUser}
+                          label="Select Buyer"
                           onChange={(e) => setSelectedUser(e.target.value)}
-                          label="Select Recipient"
                         >
                           <MenuItem value="all" disabled>
                             Choose a member...
                           </MenuItem>
                           {membersList
-                            .filter(member => member.name !== wgtParameters.displayName)
-                            .map((member) => (
-                              <MenuItem key={member.name} value={member.name}>
-                                {member.name}
+                            .filter((m) => m.name !== wgtParameters.displayName)
+                            .map((m) => (
+                              <MenuItem key={m.name} value={m.name}>
+                                {m.name}
                               </MenuItem>
                             ))}
                         </Select>
                       </FormControl>
+                    )}
 
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        startIcon={<Send size={16} />}
-                        onClick={handleTransfer}
-                        disabled={selectedUser === 'all'}
-                        sx={{
-                          backgroundColor: '#059669',
-                          '&:hover': { backgroundColor: '#047857' },
-                          '&:disabled': { backgroundColor: '#9CA3AF' }
-                        }}
-                      >
-                        Transfer NFT
-                      </Button>
-                    </div>
-                  )}
+                    <TextField
+                      fullWidth
+                      label="Price"
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Enter price"
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">{currency}</InputAdornment>
+                        ),
+                      }}
+                    />
 
-                  {activeTab === 'sell' && isOwner && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Sell NFT
-                      </h3>
-                      
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={isListing}
-                            onChange={(e) => setIsListing(e.target.checked)}
-                          />
-                        }
-                        label="Create public listing (available to anyone)"
-                      />
+                    <Button
+                      type="button"
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Tag size={16} />}
+                      onClick={handleSellOffer}
+                      disabled={!amount || Number(amount) <= 0 || (!isListing && selectedUser === "all")}
+                    >
+                      Create Sell Offer
+                    </Button>
+                  </div>
+                )}
 
-                      {!isListing && (
-                        <FormControl fullWidth>
-                          <InputLabel>Select Buyer</InputLabel>
-                          <Select
-                            value={selectedUser}
-                            onChange={(e) => setSelectedUser(e.target.value)}
-                            label="Select Buyer"
-                          >
-                            <MenuItem value="all" disabled>
-                              Choose a member...
-                            </MenuItem>
-                            {membersList
-                              .filter(member => member.name !== wgtParameters.displayName)
-                              .map((member) => (
-                                <MenuItem key={member.name} value={member.name}>
-                                  {member.name}
-                                </MenuItem>
-                              ))}
-                          </Select>
-                        </FormControl>
-                      )}
+                {activeTab === "buy" && !isOwner && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Make an Offer
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                      Submit a purchase offer to the owner.
+                    </p>
 
-                      <TextField
-                        fullWidth
-                        label="Price"
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="Enter price"
-                        InputProps={{
-                          endAdornment: currency
-                        }}
-                      />
+                    <TextField
+                      fullWidth
+                      label="Offer Amount"
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Enter your offer"
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">{currency}</InputAdornment>
+                        ),
+                      }}
+                    />
 
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        startIcon={<Tag size={16} />}
-                        onClick={handleSellOffer}
-                        disabled={!amount || (!isListing && selectedUser === 'all')}
-                        sx={{
-                          backgroundColor: '#2563EB',
-                          '&:hover': { backgroundColor: '#1D4ED8' },
-                          '&:disabled': { backgroundColor: '#9CA3AF' }
-                        }}
-                      >
-                        Create Sell Offer
-                      </Button>
-                    </div>
-                  )}
-
-                  {activeTab === 'buy' && !isOwner && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Make an Offer
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm">
-                        Submit a purchase offer to the owner.
-                      </p>
-
-                      <TextField
-                        fullWidth
-                        label="Offer Amount"
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="Enter your offer"
-                        InputProps={{
-                          endAdornment: currency
-                        }}
-                      />
-
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        startIcon={<Gavel size={16} />}
-                        onClick={handleBuyOffer}
-                        disabled={!amount}
-                        sx={{
-                          backgroundColor: '#DC2626',
-                          '&:hover': { backgroundColor: '#B91C1C' },
-                          '&:disabled': { backgroundColor: '#9CA3AF' }
-                        }}
-                      >
-                        Make Offer
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                    <Button
+                      type="button"
+                      fullWidth
+                      variant="contained"
+                      color="error"  // consistent, legible red on any theme
+                      startIcon={<Gavel size={16} />}
+                      onClick={handleBuyOffer}
+                      disabled={!amount || Number(amount) <= 0}
+                    >
+                      Make Offer
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
