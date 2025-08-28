@@ -512,7 +512,7 @@ const NFTModal = ({
                       Send this NFT to another member for free.
                     </p>
 
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={darkFieldSx}>
                       <InputLabel id="recipient-label">Select Recipient</InputLabel>
                       <Select
                         labelId="recipient-label"
@@ -520,6 +520,7 @@ const NFTModal = ({
                         value={selectedUser}
                         label="Select Recipient"
                         onChange={(e) => setSelectedUser(e.target.value)}
+                        MenuProps={darkMenuProps}
                       >
                         <MenuItem value="all" disabled>
                           Choose a member…
