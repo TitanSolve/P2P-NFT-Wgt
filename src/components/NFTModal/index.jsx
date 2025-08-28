@@ -27,12 +27,10 @@ const isPositive = (v) => {
   return Number.isFinite(n) && n > 0;
 };
 
-// Robust description extractor
 const descFromMeta = (meta) => {
   if (!meta) return "";
   const direct = meta.description || meta.Description || meta.details || meta.summary;
   if (direct) return String(direct);
-
   const attrs = meta.attributes || meta.Attributes || [];
   const found =
     attrs.find((a) =>
@@ -59,7 +57,7 @@ const NFTModal = ({
   const [isListing, setIsListing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Transaction modal
+  // QR / Transaction
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [websocketUrl, setWebsocketUrl] = useState("");
   const [transactionStatus, setTransactionStatus] = useState("");
@@ -70,7 +68,7 @@ const NFTModal = ({
   const [messageBoxType, setMessageBoxType] = useState("success");
   const [messageBoxText, setMessageBoxText] = useState("");
 
-  const availableCurrencies = ["XRP"]; // extend later if needed
+  const availableCurrencies = ["XRP"]; // extend if needed
 
   const { src: cachedImageSrc, isLoaded } = useCachedImage(
     nft?.imageURI || nft?.metadata?.image,
@@ -91,7 +89,7 @@ const NFTModal = ({
         setMessageBoxType("success");
         setMessageBoxText("Transaction completed successfully!");
         setIsMessageBoxVisible(true);
-        onAction?.(); // refresh
+        onAction?.();
       } else if (data.rejected) {
         setTransactionStatus("Transaction rejected");
         setMessageBoxType("error");
@@ -144,7 +142,7 @@ const NFTModal = ({
         setWebsocketUrl(data.refs.websocket_status);
         setIsQrModalVisible(true);
       }
-    } catch (e) {
+    } catch {
       setIsLoading(false);
       setMessageBoxType("error");
       setMessageBoxText("Error creating transfer offer. Please try again.");
@@ -159,7 +157,6 @@ const NFTModal = ({
       setIsMessageBoxVisible(true);
       return;
     }
-
     if (!isListing && selectedUser === "all") {
       setMessageBoxType("error");
       setMessageBoxText("Please select a buyer or enable public listing.");
@@ -207,7 +204,7 @@ const NFTModal = ({
         setWebsocketUrl(data.refs.websocket_status);
         setIsQrModalVisible(true);
       }
-    } catch (e) {
+    } catch {
       setIsLoading(false);
       setMessageBoxType("error");
       setMessageBoxText("Error creating sell offer. Please try again.");
@@ -225,7 +222,7 @@ const NFTModal = ({
 
     const offerAmount =
       currency === "XRP"
-        ? (parseFloat(amount) + 0.000012).toFixed(6) // tiny overhead
+        ? (parseFloat(amount) + 0.000012).toFixed(6)
         : { currency, value: String(parseFloat(amount)) };
 
     const payload = {
@@ -256,7 +253,7 @@ const NFTModal = ({
         setWebsocketUrl(data.refs.websocket_status);
         setIsQrModalVisible(true);
       }
-    } catch (e) {
+    } catch {
       setIsLoading(false);
       setMessageBoxType("error");
       setMessageBoxText("Error creating buy offer. Please try again.");
@@ -291,7 +288,6 @@ const NFTModal = ({
         slotProps={{ backdrop: { sx: { backgroundColor: "rgba(0,0,0,0.55)" } } }}
       >
         <Box
-          // Full-screen on mobile; elegant card on desktop
           sx={{
             position: "absolute",
             top: "50%",
@@ -309,7 +305,7 @@ const NFTModal = ({
           }}
           className="dark:bg-gray-900"
         >
-          {/* Subtle gradient header */}
+          {/* Header */}
           <div className="relative border-b border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-850">
             <div className="flex items-center justify-between px-5 py-4">
               <div className="min-w-0">
@@ -394,7 +390,6 @@ const NFTModal = ({
               </div>
             </div>
 
-            {/* Slim progress bar */}
             {isLoading && (
               <div className="absolute bottom-0 left-0 h-0.5 w-full bg-transparent">
                 <div className="h-full w-1/3 bg-blue-500 animate-pulse rounded-r" />
@@ -404,7 +399,7 @@ const NFTModal = ({
 
           {/* BODY */}
           <div className="grid lg:grid-cols-2 gap-0 min-h-0 flex-1">
-            {/* Image column */}
+            {/* Image */}
             <div className="p-5 overflow-y-auto">
               <div className="relative bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden ring-1 ring-gray-200 dark:ring-gray-800">
                 <img
@@ -424,33 +419,44 @@ const NFTModal = ({
             {/* Right column */}
             <div className="flex flex-col min-h-0">
               <div className="flex-1 p-5 overflow-y-auto space-y-5">
-                {/* DETAILS */}
+                {/* DETAILS — responsive definition grid */}
                 {activeTab === "details" && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       NFT Information
                     </h3>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Collection</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Collection */}
+                      <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
+                        <dt className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          Collection
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                           {nft.collectionName || "Unknown Collection"}
-                        </span>
+                        </dd>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Owner</span>
-                        <span className="text-gray-900 dark:text-white font-medium flex items-center gap-2">
+                      {/* Owner */}
+                      <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
+                        <dt className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          Owner
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
                           <User size={14} />
                           {nft.ownerName}
-                        </span>
+                        </dd>
                       </div>
 
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="text-gray-600 dark:text-gray-400 mt-0.5">Token ID</span>
-                        <span className="text-gray-900 dark:text-white font-mono text-xs break-all flex items-center gap-1">
-                          {nft.nftokenID}
+                      {/* Token ID — centered and tidy, spans full width on sm+ */}
+                      <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3 sm:col-span-2">
+                        <dt className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 text-center">
+                          Token ID
+                        </dt>
+                        <dd className="mt-1 flex flex-wrap items-center justify-center gap-2">
+                          <code className="text-xs font-mono text-gray-900 dark:text-gray-100 break-all text-center">
+                            {nft.nftokenID}
+                          </code>
                           <Tooltip title="Copy Token ID">
                             <IconButton
                               size="small"
@@ -459,18 +465,19 @@ const NFTModal = ({
                               <Copy size={14} />
                             </IconButton>
                           </Tooltip>
-                        </span>
+                        </dd>
                       </div>
 
-                      <div className="pt-2">
-                        <span className="text-gray-600 dark:text-gray-400 block mb-1">
+                      {/* Description — spans full width, responsive text */}
+                      <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3 sm:col-span-2">
+                        <dt className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
                           Description
-                        </span>
-                        <p className="text-gray-900 dark:text-gray-100 text-sm whitespace-pre-wrap break-words leading-6">
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words leading-6">
                           {description || "No description provided."}
-                        </p>
+                        </dd>
                       </div>
-                    </div>
+                    </dl>
                   </div>
                 )}
 
@@ -530,10 +537,7 @@ const NFTModal = ({
 
                     <FormControlLabel
                       control={
-                        <Switch
-                          checked={isListing}
-                          onChange={(e) => setIsListing(e.target.checked)}
-                        />
+                        <Switch checked={isListing} onChange={(e) => setIsListing(e.target.checked)} />
                       }
                       label="Public listing (available to anyone)"
                     />
@@ -558,26 +562,6 @@ const NFTModal = ({
                                 {m.name}
                               </MenuItem>
                             ))}
-                        </Select>
-                      </FormControl>
-                    )}
-
-                    {/* Currency — render if more than one */}
-                    {availableCurrencies.length > 1 && (
-                      <FormControl fullWidth>
-                        <InputLabel id="currency-label">Currency</InputLabel>
-                        <Select
-                          labelId="currency-label"
-                          id="currency"
-                          value={currency}
-                          label="Currency"
-                          onChange={(e) => setCurrency(e.target.value)}
-                        >
-                          {availableCurrencies.map((c) => (
-                            <MenuItem key={c} value={c}>
-                              {c}
-                            </MenuItem>
-                          ))}
                         </Select>
                       </FormControl>
                     )}
@@ -627,25 +611,6 @@ const NFTModal = ({
                       Submit a purchase offer to the owner.
                     </p>
 
-                    {availableCurrencies.length > 1 && (
-                      <FormControl fullWidth>
-                        <InputLabel id="offer-currency-label">Currency</InputLabel>
-                        <Select
-                          labelId="offer-currency-label"
-                          id="offer-currency"
-                          value={currency}
-                          label="Currency"
-                          onChange={(e) => setCurrency(e.target.value)}
-                        >
-                          {availableCurrencies.map((c) => (
-                            <MenuItem key={c} value={c}>
-                              {c}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-
                     <TextField
                       fullWidth
                       label="Offer Amount"
@@ -681,39 +646,10 @@ const NFTModal = ({
                   </div>
                 )}
               </div>
-
-              {/* Footer actions (sticky) */}
-              <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-end gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
-                <Button variant="outlined" onClick={handleClose} sx={{ borderRadius: 2 }}>
-                  Close
-                </Button>
-                {activeTab === "buy" && !isOwner && (
-                  <Button
-                    variant="contained"
-                    color="error"
-                    onClick={handleBuyOffer}
-                    disabled={!canSubmitBuy}
-                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
-                  >
-                    Make Offer
-                  </Button>
-                )}
-                {activeTab === "sell" && isOwner && (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleSellOffer}
-                    disabled={!canSubmitSell}
-                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
-                  >
-                    Create Sell Offer
-                  </Button>
-                )}
-              </div>
             </div>
           </div>
 
-          {/* Non-blocking loading overlay (no pointer traps) */}
+          {/* Non-blocking overlay */}
           {isLoading && (
             <div className="pointer-events-none absolute inset-0 z-20">
               <LoadingOverlayForCard />
