@@ -9,10 +9,31 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
   const [selectedNFT, setSelectedNFT] = useState(null);
   const [isNFTModalOpen, setIsNFTModalOpen] = useState(false);
 
-  // Get current user's wallet address
-  const myWalletAddress = membersList
-    ?.find(member => member.name === wgtParameters.displayName)
-    ?.userId?.split(":")[0]?.replace("@", "") || "";
+  // ----- Identify me & derive viewer wallet correctly -----
+  const myMatrixUserId = useMemo(
+    () => membersList?.find(m => m.name === wgtParameters.displayName)?.userId,
+    [membersList, wgtParameters.displayName]
+  );
+
+  const me = useMemo(
+    () =>
+      myNftData?.find(
+        (u) => u.userId === myMatrixUserId || u.name === wgtParameters.displayName
+      ),
+    [myNftData, myMatrixUserId, wgtParameters.displayName]
+  );
+
+  // Wallet for actions in modal (viewer wallet)
+  const myWalletAddress = me?.walletAddress || "";
+
+  // Exclude my own entry; keep ONLY community users
+  const communityNftData = useMemo(
+    () =>
+      (myNftData || []).filter(
+        (u) => !(u.userId === myMatrixUserId || u.name === wgtParameters.displayName)
+      ),
+    [myNftData, myMatrixUserId, wgtParameters.displayName]
+  );
 
   const handleNFTClick = (nft) => {
     setSelectedNFT(nft);
@@ -25,41 +46,31 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
   };
 
   const handleNFTAction = () => {
-    // Refresh offers or reload data after NFT actions
     if (refreshOffers) {
       refreshOffers();
     }
     handleCloseNFTModal();
   };
 
-  // Transform data to group by collections across all users
+  // Group by collections across COMMUNITY users only
   const collectionsData = useMemo(() => {
     const collections = {};
-    
-    console.log('🔍 Processing myNftData for collections:', myNftData);
-    
-    myNftData.forEach(user => {
-      console.log(`👤 Processing user ${user.name} with collections:`, user.groupedNfts);
-      
+
+    communityNftData.forEach(user => {
       user.groupedNfts?.forEach(group => {
-        // Ensure we have valid group data
-        if (!group || !group.collection) {
-          console.warn('⚠️ Invalid group data:', group);
-          return;
-        }
-        
-        // Use collectionKey (issuer-taxon) for proper grouping, fallback to collection name
-        const collectionKey = group.collectionKey || 
-                             (group.issuer && group.nftokenTaxon ? `${group.issuer}-${group.nftokenTaxon}` : null) || 
-                             group.collection;
+        if (!group || !group.collection) return;
+
+        const collectionKey =
+          group.collectionKey ||
+          (group.issuer && group.nftokenTaxon ? `${group.issuer}-${group.nftokenTaxon}` : null) ||
+          group.collection;
+
         const collectionName = group.collection;
-        
-        // console.log(`🏷️ Processing collection: ${collectionName} with key: ${collectionKey} (issuer: ${group.issuer}, taxon: ${group.nftokenTaxon})`);
-        
+
         if (!collections[collectionKey]) {
           collections[collectionKey] = {
             name: collectionName,
-            collectionKey: collectionKey,
+            collectionKey,
             issuer: group.issuer || null,
             nftokenTaxon: group.nftokenTaxon || null,
             totalNFTs: 0,
@@ -69,23 +80,22 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
             sampleImage: null
           };
         }
-        
+
         collections[collectionKey].totalNFTs += group.nftCount || group.nfts?.length || 0;
         collections[collectionKey].members.add(user.name);
-        
-        // Add NFTs if they're loaded
+
         if (group.nfts && group.nfts.length > 0) {
-          collections[collectionKey].nfts.push(...group.nfts.map(nft => ({
-            ...nft,
-            ownerName: user.name,
-            ownerWallet: user.walletAddress,
-            ownerUserId: user.userId
-          })));
+          collections[collectionKey].nfts.push(
+            ...group.nfts.map(nft => ({
+              ...nft,
+              ownerName: user.name,
+              ownerWallet: user.walletAddress,
+              ownerUserId: user.userId
+            }))
+          );
         }
-        
-        // Get sample image for collection card
+
         if (!collections[collectionKey].sampleImage) {
-          // Try multiple sources for the sample image, prioritizing CDN URLs
           if (group.nfts && group.nfts.length > 0 && group.nfts[0].imageURI) {
             collections[collectionKey].sampleImage = group.nfts[0].imageURI;
           } else if (group.collectionInfo?.sampleImage) {
@@ -100,58 +110,38 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
         }
       });
     });
-    
-    // Convert Set to array for member count
+
     Object.values(collections).forEach(collection => {
       if (collection && collection.members) {
         collection.memberCount = collection.members.size;
         collection.members = Array.from(collection.members);
       }
     });
-    
-    const result = Object.values(collections)
-      .filter(collection => collection != null) // Filter out any null/undefined collections
+
+    return Object.values(collections)
+      .filter(Boolean)
       .sort((a, b) => b.totalNFTs - a.totalNFTs);
-    console.log('✅ Final collections data:', result.map(c => ({
-      name: c.name,
-      key: c.collectionKey,
-      issuer: c.issuer,
-      taxon: c.nftokenTaxon,
-      totalNFTs: c.totalNFTs,
-      memberCount: c.memberCount
-    })));
-    
-    return result;
-  }, [myNftData]);
+  }, [communityNftData]);
 
   // Extract collection images for preloading
   const collectionImages = useMemo(() => {
-    const images = collectionsData
-      .map(collection => {
-        // console.log(`🔍 Extracting image for collection ${collection.name}:`, {
-        //   sampleImage: collection.sampleImage,
-        //   collection: collection
-        // });
-        return collection.sampleImage;
-      })
+    return collectionsData
+      .map(collection => collection.sampleImage)
       .filter(image => {
-        const isValid = image && 
-                       image.trim() !== '' && 
-                       image !== 'undefined' && 
-                       image !== 'null' && 
-                       image !== nft_pic;
-        // console.log(`🖼️ Image validation:`, { image, isValid });
+        const isValid =
+          image &&
+          image.trim() !== '' &&
+          image !== 'undefined' &&
+          image !== 'null' &&
+          image !== nft_pic;
         return isValid;
       });
-    
-    // console.log(`📊 Final collection images for preload:`, images);
-    return images;
   }, [collectionsData]);
 
   // Preload collection images
   const { preloadProgress, isPreloading } = useImagePreloader(collectionImages, {
     enabled: true,
-    delay: 500, // Wait 500ms before starting preload
+    delay: 500,
     batchSize: 3
   });
 
@@ -161,11 +151,12 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
         collection={selectedCollection}
         onBack={() => setSelectedCollection(null)}
         membersList={membersList}
-        myNftData={myNftData}
+        myNftData={communityNftData}      {/* community only */}
         wgtParameters={wgtParameters}
         refreshOffers={refreshOffers}
         widgetApi={widgetApi}
         loadCollectionNFTs={loadCollectionNFTs}
+        myWalletAddress={myWalletAddress} {/* viewer wallet */}
       />
     );
   }
@@ -179,10 +170,10 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
             <Package className="text-white w-5 h-5" />
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Collections</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Community Collections</h2>
             <div className="flex items-center gap-2">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {collectionsData.length} collection{collectionsData.length !== 1 ? 's' : ''} available in this room
+                {collectionsData.length} collection{collectionsData.length !== 1 ? 's' : ''} from other members
               </p>
               {isPreloading && (
                 <div className="flex items-center space-x-2 text-xs text-blue-600 dark:text-blue-400">
@@ -201,7 +192,7 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {collectionsData.map((collection, index) => (
               <CollectionCard
-                key={collection.name}
+                key={collection.collectionKey || collection.name}
                 collection={collection}
                 index={index}
                 onClick={() => setSelectedCollection(collection)}
@@ -214,9 +205,9 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
               <Palette className="text-gray-400 w-12 h-12" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">No Collections Found</h3>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">No Community Collections</h3>
               <p className="text-gray-600 dark:text-gray-400 max-w-md">
-                No NFT collections are available in this room yet. Be the first to share your collection!
+                Other members haven’t shared NFT collections yet.
               </p>
             </div>
           </div>
@@ -241,15 +232,14 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
 
 // Collection Card Component
 const CollectionCard = ({ collection, index, onClick }) => {
-  // Use cached image for collection sample image
   const { src: cachedImageSrc, isLoaded } = useCachedImage(
-    collection.sampleImage, // Always pass the sampleImage
-    nft_pic, // Use nft_pic as fallback
+    collection.sampleImage,
+    nft_pic,
     { eager: true }
   );
-  
+
   return (
-    <div 
+    <div
       className="cursor-pointer group animate-fade-in hover:scale-105 transition-all duration-300"
       style={{ animationDelay: `${index * 0.1}s` }}
       onClick={onClick}
@@ -268,15 +258,13 @@ const CollectionCard = ({ collection, index, onClick }) => {
               e.target.src = nft_pic;
             }}
           />
-          
-          {/* Fallback when no image */}
+
           {!cachedImageSrc && (
             <div className="absolute inset-0 w-full h-full flex items-center justify-center">
               <Palette className="text-gray-400 w-16 h-16" />
             </div>
           )}
-          
-          {/* Overlay */}
+
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <div className="absolute bottom-4 left-4 right-4">
               <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl p-3 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
@@ -308,7 +296,7 @@ const CollectionCard = ({ collection, index, onClick }) => {
                 NFTs
               </div>
             </div>
-            
+
             <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/30 rounded-xl border border-purple-200 dark:border-purple-800">
               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {collection.memberCount}
@@ -341,17 +329,22 @@ const CollectionCard = ({ collection, index, onClick }) => {
   );
 };
 
-// Collection Detail View Component  
-const CollectionDetailView = ({ collection, onBack, membersList, myNftData, wgtParameters, refreshOffers, widgetApi, loadCollectionNFTs }) => {
+// Collection Detail View Component
+const CollectionDetailView = ({
+  collection,
+  onBack,
+  membersList,
+  myNftData,            // community only
+  wgtParameters,
+  refreshOffers,
+  widgetApi,
+  loadCollectionNFTs,
+  myWalletAddress       // viewer wallet
+}) => {
   const [loadedNFTs, setLoadedNFTs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState(null);
   const [isNFTModalOpen, setIsNFTModalOpen] = useState(false);
-
-  // Get current user's wallet address
-  const myWalletAddress = membersList
-    ?.find(member => member.name === wgtParameters.displayName)
-    ?.userId?.split(":")[0]?.replace("@", "") || "";
 
   const handleNFTClick = (nft) => {
     setSelectedNFT(nft);
@@ -364,53 +357,53 @@ const CollectionDetailView = ({ collection, onBack, membersList, myNftData, wgtP
   };
 
   const handleNFTAction = () => {
-    // Refresh offers or reload data after NFT actions
     if (refreshOffers) {
       refreshOffers();
     }
     handleCloseNFTModal();
   };
 
-  // Load all NFTs for this collection from all users
+  // Load all NFTs for this collection from COMMUNITY users only
   React.useEffect(() => {
     const loadAllNFTsForCollection = async () => {
       setLoading(true);
       const allNFTs = [];
-      
+
       for (const user of myNftData) {
-        // Find the collection by collectionKey for proper matching, fallback to name
-        const userCollection = user.groupedNfts?.find(group => 
-          group.collectionKey === collection.collectionKey || 
+        const userCollection = user.groupedNfts?.find(group =>
+          group.collectionKey === collection.collectionKey ||
           (group.issuer === collection.issuer && group.nftokenTaxon === collection.nftokenTaxon) ||
           group.collection === collection.name
         );
         if (userCollection) {
           if (userCollection.nfts && userCollection.nfts.length > 0) {
-            // NFTs already loaded
-            allNFTs.push(...userCollection.nfts.map(nft => ({
-              ...nft,
-              ownerName: user.name,
-              ownerWallet: user.walletAddress,
-              ownerUserId: user.userId
-            })));
+            allNFTs.push(
+              ...userCollection.nfts.map(nft => ({
+                ...nft,
+                ownerName: user.name,
+                ownerWallet: user.walletAddress,
+                ownerUserId: user.userId
+              }))
+            );
           } else if (userCollection.nftCount > 0) {
-            // Need to load NFTs
             try {
               const nfts = await loadCollectionNFTs(
-                user.walletAddress, 
-                collection.name, 
-                user.name, 
+                user.walletAddress,
+                collection.name,
+                user.name,
                 user.userId,
                 collection.issuer,
                 collection.nftokenTaxon
               );
               if (nfts && nfts.length > 0) {
-                allNFTs.push(...nfts.map(nft => ({
-                  ...nft,
-                  ownerName: user.name,
-                  ownerWallet: user.walletAddress,
-                  ownerUserId: user.userId
-                })));
+                allNFTs.push(
+                  ...nfts.map(nft => ({
+                    ...nft,
+                    ownerName: user.name,
+                    ownerWallet: user.walletAddress,
+                    ownerUserId: user.userId
+                  }))
+                );
               }
             } catch (error) {
               console.error(`Error loading NFTs for ${user.name}:`, error);
@@ -418,7 +411,7 @@ const CollectionDetailView = ({ collection, onBack, membersList, myNftData, wgtP
           }
         }
       }
-      
+
       setLoadedNFTs(allNFTs);
       setLoading(false);
     };
@@ -469,7 +462,7 @@ const CollectionDetailView = ({ collection, onBack, membersList, myNftData, wgtP
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {loadedNFTs.map((nft, index) => (
               <NFTWithOwnerCard
-                key={`${nft.nftokenID}-${nft.ownerWallet}`}
+                key={`${nft.nftokenID || nft.NFTokenID || nft.id || index}-${nft.ownerWallet || "owner"}`}
                 nft={nft}
                 index={index}
                 wgtParameters={wgtParameters}
@@ -515,15 +508,14 @@ const CollectionDetailView = ({ collection, onBack, membersList, myNftData, wgtP
 
 // NFT with Owner Card Component
 const NFTWithOwnerCard = ({ nft, index, wgtParameters, onClick }) => {
-  // Use cached image for NFT
   const { src: cachedImageSrc, isLoaded } = useCachedImage(
-    nft.imageURI || nft.metadata?.image, // Always pass the image URL
-    nft_pic, // Use nft_pic as fallback
+    nft.imageURI || nft.metadata?.image,
+    nft_pic,
     { eager: true }
   );
-  
+
   return (
-    <div 
+    <div
       className="cursor-pointer group animate-fade-in hover:scale-105 transition-all duration-300"
       style={{ animationDelay: `${index * 0.05}s` }}
       onClick={() => onClick && onClick(nft)}
@@ -538,7 +530,7 @@ const NFTWithOwnerCard = ({ nft, index, wgtParameters, onClick }) => {
               isLoaded ? 'opacity-100' : 'opacity-0'
             } group-hover:scale-110`}
           />
-          
+
           {/* Owner badge */}
           <div className="absolute top-3 right-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-gray-900 dark:text-white shadow-lg border border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -565,7 +557,7 @@ const NFTWithOwnerCard = ({ nft, index, wgtParameters, onClick }) => {
                 {nft.ownerName}
               </span>
             </div>
-            
+
             {nft.ownerName !== wgtParameters.displayName && (
               <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full text-xs font-semibold">
                 Tradeable
