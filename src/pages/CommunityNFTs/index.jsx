@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ArrowLeft, User, Palette, Package } from "lucide-react";
+import { ArrowLeft, User, Palette, Package, Search, X } from "lucide-react";
 import nft_pic from "../../assets/nft.png";
 import { useCachedImage, useImagePreloader } from "../../hooks/useCachedImage";
 import NFTModal from "../../components/NFTModal";
@@ -8,6 +8,7 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
   const [selectedCollection, setSelectedCollection] = useState(null);
   const [selectedNFT, setSelectedNFT] = useState(null);
   const [isNFTModalOpen, setIsNFTModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const norm = (s) => (s || "").toLowerCase().trim();
 
@@ -138,9 +139,18 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
       .sort((a, b) => b.totalNFTs - a.totalNFTs);
   }, [communityNftData]);
 
-  // Extract collection images for preloading
+  // 🔎 Filter collections by owner (member) name
+  const filteredCollections = useMemo(() => {
+    const q = norm(searchTerm);
+    if (!q) return collectionsData;
+    return collectionsData.filter(c =>
+      (c.members || []).some(m => norm(m).includes(q))
+    );
+  }, [collectionsData, searchTerm]);
+
+  // Extract collection images for preloading (use filtered list)
   const collectionImages = useMemo(() => {
-    return collectionsData
+    return filteredCollections
       .map(collection => collection.sampleImage)
       .filter(image => {
         const isValid =
@@ -151,7 +161,7 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
           image !== nft_pic;
         return isValid;
       });
-  }, [collectionsData]);
+  }, [filteredCollections]);
 
   // Preload collection images
   const { preloadProgress, isPreloading } = useImagePreloader(collectionImages, {
@@ -181,32 +191,61 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
     <div className="h-full bg-gradient-to-br from-white/90 to-blue-50/90 dark:from-gray-900/90 dark:to-gray-800/90 backdrop-blur-sm">
       <div className="h-full overflow-y-auto custom-scrollbar px-3 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
-            <Package className="text-white w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Community Collections</h2>
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {collectionsData.length} collection{collectionsData.length !== 1 ? 's' : ''} from other members
-              </p>
-              {isPreloading && (
-                <div className="flex items-center space-x-2 text-xs text-blue-600 dark:text-blue-400">
-                  <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
+              <Package className="text-white w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Community Collections</h2>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {filteredCollections.length}
+                  {filteredCollections.length !== collectionsData.length && (
+                    <span className="text-gray-400 dark:text-gray-500"> / {collectionsData.length}</span>
+                  )} collection{filteredCollections.length !== 1 ? 's' : ''} from other members
+                </p>
+                {isPreloading && (
+                  <div className="flex items-center space-x-2 text-xs text-blue-600 dark:text-blue-400">
+                    <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <span>Loading images... ({Math.round(preloadProgress)}%)</span>
                   </div>
-                  <span>Loading images... ({Math.round(preloadProgress)}%)</span>
-                </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Search by owner name */}
+          <div className="w-full sm:w-72">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by owner name..."
+                aria-label="Search collections by owner name"
+                className="w-full pl-9 pr-8 py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 border border-gray-200/60 dark:border-gray-700/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="Clear search"
+                  type="button"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               )}
             </div>
           </div>
         </div>
 
         {/* Collections Grid */}
-        {collectionsData.length > 0 ? (
+        {filteredCollections.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {collectionsData.map((collection, index) => (
+            {filteredCollections.map((collection, index) => (
               <CollectionCard
                 key={collection.collectionKey || collection.name}
                 collection={collection}
@@ -221,9 +260,13 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
               <Palette className="text-gray-400 w-12 h-12" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">No Community Collections</h3>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {searchTerm ? "No matching collections" : "No Community Collections"}
+              </h3>
               <p className="text-gray-600 dark:text-gray-400 max-w-md">
-                Other members haven’t shared NFT collections yet.
+                {searchTerm
+                  ? "Try a different owner name."
+                  : "Other members haven’t shared NFT collections yet."}
               </p>
             </div>
           </div>
