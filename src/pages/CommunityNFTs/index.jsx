@@ -9,31 +9,46 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
   const [selectedNFT, setSelectedNFT] = useState(null);
   const [isNFTModalOpen, setIsNFTModalOpen] = useState(false);
 
-  // ----- Identify me & derive viewer wallet correctly -----
+  const norm = (s) => (s || "").toLowerCase().trim();
+
+  // ----- Identify me robustly -----
   const myMatrixUserId = useMemo(
     () => membersList?.find(m => m.name === wgtParameters.displayName)?.userId,
     [membersList, wgtParameters.displayName]
   );
 
-  const me = useMemo(
-    () =>
-      myNftData?.find(
-        (u) => u.userId === myMatrixUserId || u.name === wgtParameters.displayName
-      ),
-    [myNftData, myMatrixUserId, wgtParameters.displayName]
-  );
+  const myNameNorm = norm(wgtParameters.displayName);
 
-  // Wallet for actions in modal (viewer wallet)
+  // Find all of "my" user entries (handle name casing mismatches, duplicates)
+  const myEntries = useMemo(() => {
+    const entries = (myNftData || []).filter(u =>
+      norm(u.name) === myNameNorm || (myMatrixUserId && u.userId === myMatrixUserId)
+    );
+    return entries;
+  }, [myNftData, myMatrixUserId, myNameNorm]);
+
+  // Known self wallets (in case there are multiple)
+  const myWalletSet = useMemo(() => {
+    const set = new Set();
+    myEntries.forEach(e => {
+      if (e.walletAddress) set.add(norm(e.walletAddress));
+    });
+    return set;
+  }, [myEntries]);
+
+  // Main "me" record (first match) + wallet for modal actions
+  const me = myEntries[0];
   const myWalletAddress = me?.walletAddress || "";
 
-  // Exclude my own entry; keep ONLY community users
-  const communityNftData = useMemo(
-    () =>
-      (myNftData || []).filter(
-        (u) => !(u.userId === myMatrixUserId || u.name === wgtParameters.displayName)
-      ),
-    [myNftData, myMatrixUserId, wgtParameters.displayName]
-  );
+  // Exclude my own entry/users by (name || userId || wallet)
+  const communityNftData = useMemo(() => {
+    return (myNftData || []).filter(u => {
+      const isMyName = norm(u.name) === myNameNorm;
+      const isMyId = myMatrixUserId && u.userId === myMatrixUserId;
+      const isMyWallet = u.walletAddress && myWalletSet.has(norm(u.walletAddress));
+      return !(isMyName || isMyId || isMyWallet);
+    });
+  }, [myNftData, myMatrixUserId, myNameNorm, myWalletSet]);
 
   const handleNFTClick = (nft) => {
     setSelectedNFT(nft);
@@ -151,12 +166,13 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
         collection={selectedCollection}
         onBack={() => setSelectedCollection(null)}
         membersList={membersList}
-        myNftData={communityNftData}      {/* community only */}
+        myNftData={communityNftData}      // community only
         wgtParameters={wgtParameters}
         refreshOffers={refreshOffers}
         widgetApi={widgetApi}
         loadCollectionNFTs={loadCollectionNFTs}
-        myWalletAddress={myWalletAddress} {/* viewer wallet */}
+        myWalletAddress={myWalletAddress} // viewer wallet
+        myWalletSet={myWalletSet}         // for extra safety filtering
       />
     );
   }
@@ -219,7 +235,9 @@ const CommunityNFTs = ({ membersList, myNftData, wgtParameters, refreshOffers, w
         isOpen={isNFTModalOpen}
         onClose={handleCloseNFTModal}
         nft={selectedNFT}
-        isOwner={selectedNFT?.ownerName === wgtParameters.displayName}
+        isOwner={selectedNFT?.ownerWallet && myWalletAddress
+          ? norm(selectedNFT.ownerWallet) === norm(myWalletAddress)
+          : selectedNFT?.ownerName === wgtParameters.displayName}
         membersList={membersList}
         wgtParameters={wgtParameters}
         myWalletAddress={myWalletAddress}
@@ -339,12 +357,15 @@ const CollectionDetailView = ({
   refreshOffers,
   widgetApi,
   loadCollectionNFTs,
-  myWalletAddress       // viewer wallet
+  myWalletAddress,      // viewer wallet
+  myWalletSet           // Set of normalized self wallets
 }) => {
   const [loadedNFTs, setLoadedNFTs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState(null);
   const [isNFTModalOpen, setIsNFTModalOpen] = useState(false);
+
+  const norm = (s) => (s || "").toLowerCase().trim();
 
   const handleNFTClick = (nft) => {
     setSelectedNFT(nft);
@@ -367,7 +388,7 @@ const CollectionDetailView = ({
   React.useEffect(() => {
     const loadAllNFTsForCollection = async () => {
       setLoading(true);
-      const allNFTs = [];
+      let allNFTs = [];
 
       for (const user of myNftData) {
         const userCollection = user.groupedNfts?.find(group =>
@@ -412,12 +433,19 @@ const CollectionDetailView = ({
         }
       }
 
+      // 🔒 Safety filter: drop any of *my* NFTs that slipped through
+      if (myWalletSet && myWalletSet.size > 0) {
+        allNFTs = allNFTs.filter(nft => !myWalletSet.has(norm(nft.ownerWallet)));
+      } else if (myWalletAddress) {
+        allNFTs = allNFTs.filter(nft => norm(nft.ownerWallet) !== norm(myWalletAddress));
+      }
+
       setLoadedNFTs(allNFTs);
       setLoading(false);
     };
 
     loadAllNFTsForCollection();
-  }, [collection, myNftData, loadCollectionNFTs]);
+  }, [collection, myNftData, loadCollectionNFTs, myWalletAddress, myWalletSet]);
 
   return (
     <div className="h-full bg-gradient-to-br from-white/90 to-blue-50/90 dark:from-gray-900/90 dark:to-gray-800/90 backdrop-blur-sm">
@@ -466,10 +494,8 @@ const CollectionDetailView = ({
                 nft={nft}
                 index={index}
                 wgtParameters={wgtParameters}
-                membersList={membersList}
-                refreshOffers={refreshOffers}
-                widgetApi={widgetApi}
                 onClick={handleNFTClick}
+                myWalletAddress={myWalletAddress}
               />
             ))}
           </div>
@@ -479,12 +505,8 @@ const CollectionDetailView = ({
               <span className="text-3xl">🎨</span>
             </div>
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                No NFTs Available
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                No NFTs are currently available in this collection
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No NFTs Available</h3>
+              <p className="text-gray-600 dark:text-gray-400">No NFTs are currently available in this collection</p>
             </div>
           </div>
         )}
@@ -495,7 +517,9 @@ const CollectionDetailView = ({
         isOpen={isNFTModalOpen}
         onClose={handleCloseNFTModal}
         nft={selectedNFT}
-        isOwner={selectedNFT?.ownerName === wgtParameters.displayName}
+        isOwner={selectedNFT?.ownerWallet && myWalletAddress
+          ? norm(selectedNFT.ownerWallet) === norm(myWalletAddress)
+          : selectedNFT?.ownerName === wgtParameters.displayName}
         membersList={membersList}
         wgtParameters={wgtParameters}
         myWalletAddress={myWalletAddress}
@@ -507,12 +531,17 @@ const CollectionDetailView = ({
 };
 
 // NFT with Owner Card Component
-const NFTWithOwnerCard = ({ nft, index, wgtParameters, onClick }) => {
+const NFTWithOwnerCard = ({ nft, index, wgtParameters, onClick, myWalletAddress }) => {
   const { src: cachedImageSrc, isLoaded } = useCachedImage(
     nft.imageURI || nft.metadata?.image,
     nft_pic,
     { eager: true }
   );
+
+  const isMineByWallet =
+    nft.ownerWallet && myWalletAddress
+      ? (nft.ownerWallet || "").toLowerCase().trim() === (myWalletAddress || "").toLowerCase().trim()
+      : false;
 
   return (
     <div
@@ -558,7 +587,8 @@ const NFTWithOwnerCard = ({ nft, index, wgtParameters, onClick }) => {
               </span>
             </div>
 
-            {nft.ownerName !== wgtParameters.displayName && (
+            {/* Tradeable if NOT mine (wallet-based check first, fallback to displayName) */}
+            {(!isMineByWallet && nft.ownerName !== wgtParameters.displayName) && (
               <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full text-xs font-semibold">
                 Tradeable
               </div>
