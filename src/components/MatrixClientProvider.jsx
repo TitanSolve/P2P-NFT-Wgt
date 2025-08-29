@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { STATE_EVENT_ROOM_MEMBER } from "@matrix-widget-toolkit/api";
 import axios from "axios";
 import { Client, NFTokenCreateOfferFlags } from "xrpl";
-import NFTs from "../pages/NFTs";
+import CommunityNFTs from "../pages/CommunityNFTs";
+import MyNFTs from "../pages/MyNFTs";
 import Offers from "../pages/Offers";
 import API_URLS from "../config";
 import "./index.css";
@@ -800,7 +801,8 @@ const MatrixClientProvider = () => {
                 },
               }}
             >
-              <Tab label="NFTs" className="text-gray-900 dark:text-white" />
+              <Tab label="My NFTs" className="text-gray-900 dark:text-white" />
+              <Tab label="Community NFTs" className="text-gray-900 dark:text-white" />
               <Tab label="Offers" className="text-gray-900 dark:text-white" />
             </Tabs>
           </div>
@@ -810,14 +812,14 @@ const MatrixClientProvider = () => {
             <AnimatePresence mode="wait">
               {selectedIndex === 0 && (
                 <motion.div
-                  key="nfts"
+                  key="myNfts"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
                   className="h-full"
                 >
-                  <NFTs
+                  <MyNFTs
                     membersList={membersList}
                     myNftData={myNftData}
                     getImageData={getImageData}
@@ -830,6 +832,27 @@ const MatrixClientProvider = () => {
                 </motion.div>
               )}
               {selectedIndex === 1 && (
+                <motion.div
+                  key="nfts"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="h-full"
+                >
+                  <CommunityNFTs
+                    membersList={membersList}
+                    myNftData={myNftData}
+                    getImageData={getImageData}
+                    wgtParameters={widgetApi.widgetParameters}
+                    refreshOffers={refreshOffers}
+                    widgetApi={widgetApi}
+                    loadCollectionNFTs={handleLoadCollectionNFTs}
+                    loadingCollections={loadingCollections}
+                  />
+                </motion.div>
+              )}
+              {selectedIndex === 2 && (
                 <motion.div
                   key="offers"
                   initial={{ opacity: 0, y: 20 }}
