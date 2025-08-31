@@ -36,132 +36,182 @@ const getNftId = (n) => n?.nftokenID || n?.NFTokenID || n?.id;
 const keyFromIssuerTaxon = (issuer, taxon) =>
   issuer && taxon ? `${issuer}-${taxon}` : null;
 
+// Flag check for "sell" offers on XRPL
+const isSellFlag = (flags) => (flags & 1) === 1;
+
+const setNftOwnerFields = (nft, buyerUser) => {
+  const buyerWallet = buyerUser.walletAddress;
+  const buyerName = buyerUser.name;
+  const buyerUserId = buyerUser.userId;
+
+  return {
+    ...nft,
+    // XRPL / API fields
+    owner: buyerWallet,
+    ownerChangedAt: Math.floor(Date.now() / 1000),
+
+    // Our app convenience fields
+    ownerWallet: buyerWallet,
+    ownerName: buyerName,
+    ownerUserId: buyerUserId,
+
+    // Some places in your UI rely on userName/userId too
+    userName: buyerName,
+    userId: buyerUserId,
+
+    // Keep ownerDetails consistent if present
+    ownerDetails: {
+      ...(nft.ownerDetails || {}),
+      address: buyerWallet,
+      username: buyerName ?? (nft.ownerDetails?.username ?? null),
+      // don't invent a service; preserve what you had
+      service: nft.ownerDetails?.service ?? null,
+    },
+  };
+};
+
+
 /**
- * Apply a single NFT transfer to myNftData.
- * - Removes NFT from seller user/group
- * - Adds NFT to buyer user/group (creates group if missing, with correct issuer/taxon/collectionKey)
- * - Keeps nftCount in sync and preserves collection metadata when possible
+ * Apply a single NFT transfer across myNftData immutably:
+ *  - Remove from seller's group (drop group if empty)
+ *  - Add to buyer's group (create if missing)
+ *  - Update NFT owner fields (owner / ownerWallet / names / ids / ownerDetails)
+ *  - Keep nftCount consistent
  */
-function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
+const applyNftTransfer = (prevData, { nftId, sellerWallet, buyerWallet }) => {
   try {
-    const sellerIdx = prevData.findIndex((u) => u.walletAddress === sellerWallet);
+    const sellerIdx = prevData.findIndex(u => u.walletAddress === sellerWallet);
     if (sellerIdx === -1) return prevData;
     const seller = prevData[sellerIdx];
-    if (!seller?.groupedNfts?.length) return prevData;
 
-    // 1) Find NFT & its group under the seller
-    let foundGroupIdx = -1;
-    let foundNftIdx = -1;
-    for (let gi = 0; gi < seller.groupedNfts.length; gi++) {
+    // Find the NFT under the seller
+    let sGroupIdx = -1, sNftIdx = -1;
+    for (let gi = 0; gi < (seller.groupedNfts?.length || 0); gi++) {
       const g = seller.groupedNfts[gi];
       if (!g?.nfts?.length) continue;
-      const ni = g.nfts.findIndex((n) => getNftId(n) === nftId);
-      if (ni !== -1) {
-        foundGroupIdx = gi;
-        foundNftIdx = ni;
-        break;
-      }
+      const ni = g.nfts.findIndex(n => getNftId(n) === nftId);
+      if (ni !== -1) { sGroupIdx = gi; sNftIdx = ni; break; }
     }
-    if (foundGroupIdx === -1 || foundNftIdx === -1) return prevData;
+    if (sGroupIdx === -1 || sNftIdx === -1) return prevData;
 
-    const sellerGroup = seller.groupedNfts[foundGroupIdx];
-    const original = sellerGroup.nfts[foundNftIdx];
+    const sGroup = seller.groupedNfts[sGroupIdx];
+    const original = sGroup.nfts[sNftIdx];
 
-    // 2) Remove from seller
-    const newSellerGroupNfts = sellerGroup.nfts.filter((n) => getNftId(n) !== nftId);
-    const newSellerGroup =
-      newSellerGroupNfts.length > 0
+    // --- remove from seller (and decrement counts) ---
+    const newSellerGroupNfts = sGroup.nfts.filter(n => getNftId(n) !== nftId);
+
+    const decCount = (g) => ({
+      ...g,
+      nftCount: Math.max(0, (g.nftCount ?? (g.nfts ? g.nfts.length : 0)) - 1),
+      collectionInfo: g.collectionInfo
         ? {
-            ...sellerGroup,
-            nfts: newSellerGroupNfts,
-            nftCount: Math.max(
-              0,
-              (sellerGroup.nftCount ?? sellerGroup.nfts.length) - 1
-            ),
-          }
-        : null;
+          ...g.collectionInfo,
+          nftCount: Math.max(
+            0,
+            (g.collectionInfo.nftCount ??
+              g.nftCount ??
+              (g.nfts ? g.nfts.length : 0)) - 1
+          ),
+        }
+        : g.collectionInfo,
+    });
+
+    const newSellerGroup = newSellerGroupNfts.length
+      ? decCount({ ...sGroup, nfts: newSellerGroupNfts })
+      : null;
+
     const newSellerGroups = [
-      ...seller.groupedNfts.slice(0, foundGroupIdx),
+      ...seller.groupedNfts.slice(0, sGroupIdx),
       ...(newSellerGroup ? [newSellerGroup] : []),
-      ...seller.groupedNfts.slice(foundGroupIdx + 1),
+      ...seller.groupedNfts.slice(sGroupIdx + 1),
     ];
 
-    // 3) Resolve buyer user
-    const buyerIdx = prevData.findIndex((u) => u.walletAddress === buyerWallet);
+    // If buyer isn't in room, at least remove from seller
+    const buyerIdx = prevData.findIndex(u => u.walletAddress === buyerWallet);
     if (buyerIdx === -1) {
-      // Buyer not in room; still remove from seller so UI won’t show old owner
       return prevData.map((u, i) =>
         i === sellerIdx ? { ...seller, groupedNfts: newSellerGroups } : u
       );
     }
     const buyer = prevData[buyerIdx];
 
-    // 4) Build a moved copy and UPDATE owner fields to buyer
-    const moved = {
-      ...original,
-      ownerWallet: buyerWallet,
-      ownerName: buyer.name,
-      userName: buyer.name,
-      userId: buyer.userId,
-    };
+    // --- update NFT fields to new owner ---
+    const moved = setNftOwnerFields(original, buyer);
 
-    // 5) Determine grouping metadata
-    const issuer = moved.issuer ?? sellerGroup.issuer ?? null;
-    const taxon = moved.nftokenTaxon ?? sellerGroup.nftokenTaxon ?? null;
+    // Preserve grouping metadata
+    const issuer = moved.issuer ?? sGroup.issuer ?? null;
+    const taxon = moved.nftokenTaxon ?? sGroup.nftokenTaxon ?? null;
     const collectionKey =
       keyFromIssuerTaxon(issuer, taxon) ||
-      sellerGroup.collectionKey ||
+      sGroup.collectionKey ||
       moved.collectionName ||
-      sellerGroup.collection;
+      sGroup.collection;
 
     const collectionName =
       moved?.metadata?.collection?.name ||
       moved?.collectionName ||
-      sellerGroup?.collection ||
+      sGroup?.collection ||
       `Collection ${taxon ?? "Unknown"}`;
 
-    // 6) Insert into buyer group (match by key/issuer+taxon/name)
-    const buyerGroupIdx = (buyer.groupedNfts || []).findIndex(
-      (g) =>
+    // --- add to buyer group (create if missing, increment counts) ---
+    const bGroupIdx = (buyer.groupedNfts || []).findIndex(
+      g =>
         g.collectionKey === collectionKey ||
         (g.issuer === issuer && g.nftokenTaxon === taxon) ||
         g.collection === collectionName
     );
 
+    const incCount = (g) => ({
+      ...g,
+      nftCount: (g.nftCount ?? (g.nfts ? g.nfts.length : 0)) + 1,
+      collectionInfo: g.collectionInfo
+        ? {
+          ...g.collectionInfo,
+          nftCount:
+            (g.collectionInfo.nftCount ??
+              g.nftCount ??
+              (g.nfts ? g.nfts.length : 0)) + 1,
+        }
+        : g.collectionInfo,
+    });
+
     let newBuyerGroups;
-    if (buyerGroupIdx !== -1) {
-      const g = buyer.groupedNfts[buyerGroupIdx];
-      const newG = {
-        ...g,
-        nfts: [...(g.nfts || []), moved],
-        nftCount: (g.nftCount ?? (g.nfts ? g.nfts.length : 0)) + 1,
-      };
+    if (bGroupIdx !== -1) {
+      const g = buyer.groupedNfts[bGroupIdx];
+      const newG = incCount({ ...g, nfts: [...(g.nfts || []), moved] });
       newBuyerGroups = [
-        ...buyer.groupedNfts.slice(0, buyerGroupIdx),
+        ...buyer.groupedNfts.slice(0, bGroupIdx),
         newG,
-        ...buyer.groupedNfts.slice(buyerGroupIdx + 1),
+        ...buyer.groupedNfts.slice(bGroupIdx + 1),
       ];
     } else {
-      // Create new group with proper collectionInfo
       const sampleImage =
         moved?.assets?.image ||
         moved?.metadata?.image ||
         moved?.imageURI ||
-        sellerGroup?.collectionInfo?.sampleImage ||
+        sGroup?.collectionInfo?.sampleImage ||
         null;
 
       const collectionInfo =
-        sellerGroup?.collectionInfo
-          ? { ...sellerGroup.collectionInfo, sampleImage, name: collectionName, issuer, nftokenTaxon: taxon, collectionKey }
+        sGroup?.collectionInfo
+          ? {
+            ...sGroup.collectionInfo,
+            sampleImage,
+            name: collectionName,
+            issuer,
+            nftokenTaxon: taxon,
+            collectionKey,
+            nftCount: 1,
+          }
           : {
-              name: collectionName,
-              issuer,
-              nftokenTaxon: taxon,
-              collectionKey,
-              nftCount: 1,
-              sampleImage,
-              sampleNft: moved,
-            };
+            name: collectionName,
+            issuer,
+            nftokenTaxon: taxon,
+            collectionKey,
+            nftCount: 1,
+            sampleImage,
+            sampleNft: moved,
+          };
 
       const newGroup = {
         collection: collectionName,
@@ -175,7 +225,7 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
       newBuyerGroups = [...(buyer.groupedNfts || []), newGroup];
     }
 
-    // 7) Return updated state
+    // --- return updated data ---
     return prevData.map((u, i) => {
       if (i === sellerIdx) return { ...seller, groupedNfts: newSellerGroups };
       if (i === buyerIdx) return { ...buyer, groupedNfts: newBuyerGroups };
@@ -185,7 +235,7 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
     console.warn("applyNftTransfer error:", e);
     return prevData;
   }
-}
+};
 // ---------------------------------------------------
 
 const MatrixClientProvider = () => {
@@ -605,58 +655,60 @@ const MatrixClientProvider = () => {
               setCancelledOffer(offerIds);
             }
           } else if (type === "NFTokenAcceptOffer") {
-            const sellOfferId = tx?.tx_json?.NFTokenSellOffer;
-            const buyOfferId = tx?.tx_json?.NFTokenBuyOffer;
+            const sellOfferId = tx?.tx_json?.NFTokenSellOffer || null;
+            const buyOfferId = tx?.tx_json?.NFTokenBuyOffer || null;
 
-            let buyerWallet = null;
-            let sellerWallet = null;
-            let nftId = null;
+            const affected = tx?.meta?.AffectedNodes || [];
 
-            // Two acceptance paths
-            if (tx?.tx_json?.NFTokenBrokerFee > 15) {
-              for (const node of tx.meta.AffectedNodes) {
-                if (
-                  node.DeletedNode &&
-                  node.DeletedNode.LedgerEntryType === "NFTokenOffer" &&
-                  node.DeletedNode.FinalFields
-                ) {
-                  const offer = node.DeletedNode.FinalFields;
-                  const isSell = (offer.Flags & 1) === 1;
-                  nftId = node?.DeletedNode?.FinalFields?.NFTokenID;
+            // Find consumed (DeletedNode) NFTokenOffer entries
+            const deletedOffers = affected
+              .map(n => n.DeletedNode)
+              .filter(n => n?.LedgerEntryType === "NFTokenOffer" && n?.FinalFields);
 
-                  if (isSell) {
-                    sellerWallet = offer.Owner;
-                  } else {
-                    buyerWallet = offer.Owner;
-                  }
+            // Helper: lsfSellNFToken flag bit (1)
+            const isSell = (flags) => (flags & 1) === 1;
+
+            // If two offers got deleted, it's brokered (sell+buy)
+            const sellNode = deletedOffers.find(n => isSell(n.FinalFields.Flags));
+            const buyNode = deletedOffers.find(n => !isSell(n.FinalFields.Flags));
+
+            let sellerWallet = sellNode?.FinalFields?.Owner || null;
+            let buyerWallet = buyNode?.FinalFields?.Owner || null;
+            let nftId = sellNode?.FinalFields?.NFTokenID
+              || buyNode?.FinalFields?.NFTokenID
+              || null;
+
+            // Non-brokered fallback: buyer is the tx Account,
+            // and we try to find the deleted sell offer to get seller/nftId.
+            if (!buyerWallet) {
+              buyerWallet = tx?.tx_json?.Account || null;
+
+              if (!sellerWallet || !nftId) {
+                const sellOfferNode = affected.find(
+                  n => n.DeletedNode?.LedgerEntryType === "NFTokenOffer" &&
+                    (n.DeletedNode?.FinalFields?.Flags & 1) === 1
+                );
+                if (sellOfferNode) {
+                  sellerWallet = sellerWallet || sellOfferNode.DeletedNode.FinalFields.Owner;
+                  nftId = nftId || sellOfferNode.DeletedNode.FinalFields.NFTokenID;
                 }
               }
-            } else {
-              buyerWallet = tx?.tx_json?.Account;
-              const affectedNodes = tx?.meta?.AffectedNodes;
-              const sellOfferNode = affectedNodes.find(
-                (node) =>
-                  node.DeletedNode?.LedgerEntryType === "NFTokenOffer" &&
-                  node.DeletedNode.FinalFields?.Flags === 1
-              );
-              sellerWallet = sellOfferNode?.DeletedNode?.FinalFields?.Owner;
-              nftId = sellOfferNode?.DeletedNode?.FinalFields?.NFTokenID;
             }
 
             console.log("Offer accepted details", {
-              sellOfferId,
-              buyOfferId,
-              buyerWallet,
-              sellerWallet,
-              nftId,
+              sellOfferId, buyOfferId, buyerWallet, sellerWallet, nftId,
             });
 
-            setCancelledOffer([sellOfferId, buyOfferId]);
+            const ids = [sellOfferId, buyOfferId].filter(Boolean);
+            if (ids.length) setCancelledOffer(ids);
 
-            // ✅ Apply ownership change immutably to refresh MyNFTs & CommunityNFTs
-            setMyNftData((prev) =>
-              applyNftTransfer(prev, { nftId, sellerWallet, buyerWallet })
-            );
+            if (buyerWallet && sellerWallet && nftId) {
+              setMyNftData(prev =>
+                applyNftTransfer(prev, { nftId, sellerWallet, buyerWallet })
+              );
+            } else {
+              console.warn("Could not resolve buyer/seller/nftId for NFTokenAcceptOffer", tx);
+            }
           }
         }
       }
