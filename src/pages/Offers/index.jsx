@@ -60,6 +60,8 @@ const Offers = ({
     if (broker && !map.has(broker)) map.set(broker, "Broker");
     if (myWalletAddress) map.set(myWalletAddress, myDisplayName || "You");
 
+    console.log("Address to Name map:", map);
+
     return map;
   }, [membersList, myNftData, myWalletAddress, myDisplayName]);
 
