@@ -31,6 +31,157 @@ const getImageData = async (nft) => {
   return { name: name, URI: URI };
 };
 
+// ---------- helpers for transfer updates ----------
+const getNftId = (n) => n?.nftokenID || n?.NFTokenID || n?.id;
+const keyFromIssuerTaxon = (issuer, taxon) =>
+  issuer && taxon ? `${issuer}-${taxon}` : null;
+
+/**
+ * Apply a single NFT transfer to myNftData.
+ * - Removes NFT from seller user/group
+ * - Adds NFT to buyer user/group (creates group if missing, with correct issuer/taxon/collectionKey)
+ * - Keeps nftCount in sync and preserves collection metadata when possible
+ */
+function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
+  try {
+    const sellerIdx = prevData.findIndex((u) => u.walletAddress === sellerWallet);
+    if (sellerIdx === -1) return prevData;
+
+    const seller = prevData[sellerIdx];
+    if (!seller?.groupedNfts?.length) return prevData;
+
+    // Find the NFT + its seller group
+    let foundGroupIdx = -1;
+    let foundNftIdx = -1;
+    for (let gi = 0; gi < seller.groupedNfts.length; gi++) {
+      const g = seller.groupedNfts[gi];
+      if (!g?.nfts?.length) continue;
+      const ni = g.nfts.findIndex((n) => getNftId(n) === nftId);
+      if (ni !== -1) {
+        foundGroupIdx = gi;
+        foundNftIdx = ni;
+        break;
+      }
+    }
+    if (foundGroupIdx === -1 || foundNftIdx === -1) return prevData;
+
+    const sellerGroup = seller.groupedNfts[foundGroupIdx];
+    const nftToTransfer = sellerGroup.nfts[foundNftIdx];
+    const moved = { ...nftToTransfer }; // immutable copy
+
+    // Remove NFT from seller group (and drop empty groups)
+    const newSellerGroupNfts = sellerGroup.nfts.filter((n) => getNftId(n) !== nftId);
+    const newSellerGroup =
+      newSellerGroupNfts.length > 0
+        ? {
+            ...sellerGroup,
+            nfts: newSellerGroupNfts,
+            nftCount: Math.max(
+              0,
+              (sellerGroup.nftCount ?? sellerGroup.nfts.length) - 1
+            ),
+          }
+        : null;
+
+    const newSellerGroups = [
+      ...seller.groupedNfts.slice(0, foundGroupIdx),
+      ...(newSellerGroup ? [newSellerGroup] : []),
+      ...seller.groupedNfts.slice(foundGroupIdx + 1),
+    ];
+
+    // If buyer not present in room, just update seller removal
+    const buyerIdx = prevData.findIndex((u) => u.walletAddress === buyerWallet);
+    if (buyerIdx === -1) {
+      return prevData.map((u, i) =>
+        i === sellerIdx ? { ...seller, groupedNfts: newSellerGroups } : u
+      );
+    }
+
+    const buyer = prevData[buyerIdx];
+
+    // Derive collection key/name for the NFT being moved
+    const issuer = moved.issuer ?? sellerGroup.issuer ?? null;
+    const taxon = moved.nftokenTaxon ?? sellerGroup.nftokenTaxon ?? null;
+    const collectionKey =
+      keyFromIssuerTaxon(issuer, taxon) ||
+      sellerGroup.collectionKey ||
+      moved.collectionName ||
+      sellerGroup.collection;
+
+    const collectionName =
+      moved?.metadata?.collection?.name ||
+      moved?.collectionName ||
+      sellerGroup?.collection ||
+      `Collection ${taxon ?? "Unknown"}`;
+
+    // Try to find matching buyer group by key (preferred) or fallback by name
+    const buyerGroupIdx = (buyer.groupedNfts || []).findIndex(
+      (g) =>
+        g.collectionKey === collectionKey ||
+        (g.issuer === issuer && g.nftokenTaxon === taxon) ||
+        g.collection === collectionName
+    );
+
+    let newBuyerGroups;
+    if (buyerGroupIdx !== -1) {
+      const g = buyer.groupedNfts[buyerGroupIdx];
+      const newG = {
+        ...g,
+        nfts: [...(g.nfts || []), moved],
+        nftCount: (g.nftCount ?? (g.nfts ? g.nfts.length : 0)) + 1,
+      };
+      newBuyerGroups = [
+        ...buyer.groupedNfts.slice(0, buyerGroupIdx),
+        newG,
+        ...buyer.groupedNfts.slice(buyerGroupIdx + 1),
+      ];
+    } else {
+      // Create a new buyer group with complete metadata
+      const sampleImage =
+        moved?.assets?.image ||
+        moved?.metadata?.image ||
+        moved?.imageURI ||
+        sellerGroup?.collectionInfo?.sampleImage ||
+        null;
+
+      const collectionInfo =
+        sellerGroup?.collectionInfo
+          ? { ...sellerGroup.collectionInfo, sampleImage }
+          : {
+              name: collectionName,
+              issuer,
+              nftokenTaxon: taxon,
+              collectionKey,
+              nftCount: 1,
+              sampleImage,
+              sampleNft: moved,
+            };
+
+      const newGroup = {
+        collection: collectionName,
+        collectionKey,
+        issuer: issuer || null,
+        nftokenTaxon: taxon || null,
+        nfts: [moved],
+        nftCount: 1,
+        collectionInfo,
+      };
+      newBuyerGroups = [...(buyer.groupedNfts || []), newGroup];
+    }
+
+    // Build final immutable array
+    return prevData.map((u, i) => {
+      if (i === sellerIdx) return { ...seller, groupedNfts: newSellerGroups };
+      if (i === buyerIdx) return { ...buyer, groupedNfts: newBuyerGroups };
+      return u;
+    });
+  } catch (e) {
+    console.warn("applyNftTransfer error:", e);
+    return prevData;
+  }
+}
+// ---------------------------------------------------
+
 const MatrixClientProvider = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const widgetApi = useWidgetApi();
@@ -48,7 +199,6 @@ const MatrixClientProvider = () => {
   const [loadingCollections, setLoadingCollections] = useState({}); // Track loading state per collection
   const [showCacheDebug, setShowCacheDebug] = useState(false); // Debug panel toggle
 
-  // Function to load collections metadata only (without individual NFTs)
   // Function to load collections metadata AND the user's NFTs grouped by collection
   const loadUserCollections = async (walletAddress) => {
     try {
@@ -85,7 +235,7 @@ const MatrixClientProvider = () => {
 
       // Build collection summaries from the grouped NFTs
       const collections = Object.entries(nftsByKey).map(([collectionKey, list]) => {
-        const sample = list.find(n => n.imageURI) || list[0];
+        const sample = list.find((n) => n.imageURI) || list[0];
         const name =
           sample?.metadata?.collection?.name ||
           sample?.metadata?.name ||
@@ -111,10 +261,10 @@ const MatrixClientProvider = () => {
     }
   };
 
-
   // Function to load NFTs for a specific collection on demand
   const loadCollectionNFTs = async (walletAddress, collectionName, userName, userId, issuer = null, nftokenTaxon = null) => {
-    const cacheKey = issuer && nftokenTaxon ? `${walletAddress}-${issuer}-${nftokenTaxon}` : `${walletAddress}-${collectionName}`;
+    const cacheKey =
+      issuer && nftokenTaxon ? `${walletAddress}-${issuer}-${nftokenTaxon}` : `${walletAddress}-${collectionName}`;
 
     // Return cached data if available
     if (loadedCollections[cacheKey]) {
@@ -126,7 +276,7 @@ const MatrixClientProvider = () => {
       return null;
     }
 
-    setLoadingCollections(prev => ({ ...prev, [cacheKey]: true }));
+    setLoadingCollections((prev) => ({ ...prev, [cacheKey]: true }));
 
     try {
       // First, fetch all NFTs for the wallet
@@ -150,11 +300,9 @@ const MatrixClientProvider = () => {
       // Filter NFTs by issuer and taxon if provided, otherwise by collection name
       let filteredNfts = allNfts;
       if (issuer && nftokenTaxon) {
-        filteredNfts = allNfts.filter(nft =>
-          nft.issuer === issuer && nft.nftokenTaxon === nftokenTaxon
-        );
+        filteredNfts = allNfts.filter((nft) => nft.issuer === issuer && nft.nftokenTaxon === nftokenTaxon);
       } else if (collectionName) {
-        filteredNfts = allNfts.filter(nft => {
+        filteredNfts = allNfts.filter((nft) => {
           const nftCollectionName = nft.metadata?.collection?.name || nft.collection;
           return nftCollectionName === collectionName;
         });
@@ -162,7 +310,6 @@ const MatrixClientProvider = () => {
 
       const enrichedNfts = await Promise.all(
         filteredNfts.map(async (nft) => {
-          // Prioritize Bithomp CDN URLs over IPFS URLs for better performance
           const imageURI = nft.assets?.image || nft.metadata?.image || nft.imageURI || "";
           return {
             ...nft,
@@ -176,42 +323,31 @@ const MatrixClientProvider = () => {
       );
 
       // Preload images for better UX
-      const imageUrls = enrichedNfts
-        .map(nft => nft.imageURI)
-        .filter(url => url && url.trim() !== '');
+      const imageUrls = enrichedNfts.map((nft) => nft.imageURI).filter((url) => url && url.trim() !== "");
 
       if (imageUrls.length > 0) {
-        // console.log(`🖼️ Preloading ${imageUrls.length} NFT images for collection ${collectionName}`);
-        imageCache.preloadImages(imageUrls).catch(error => {
-          console.warn('Failed to preload some images:', error);
+        imageCache.preloadImages(imageUrls).catch((error) => {
+          console.warn("Failed to preload some images:", error);
         });
       }
 
       // Cache the loaded NFTs
-      setLoadedCollections(prev => ({ ...prev, [cacheKey]: enrichedNfts }));
-      setLoadingCollections(prev => ({ ...prev, [cacheKey]: false }));
+      setLoadedCollections((prev) => ({ ...prev, [cacheKey]: enrichedNfts }));
+      setLoadingCollections((prev) => ({ ...prev, [cacheKey]: false }));
 
       return enrichedNfts;
     } catch (error) {
       console.error(`Error fetching NFTs for collection ${collectionName}:`, error.message);
-      setLoadingCollections(prev => ({ ...prev, [cacheKey]: false }));
+      setLoadingCollections((prev) => ({ ...prev, [cacheKey]: false }));
       return [];
     }
   };
-
-  // useEffect(() => {
-  //   return () => {
-  //     client.disconnect();
-  //   };
-  // }, []);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const events = await widgetApi.receiveStateEvents(
-          STATE_EVENT_ROOM_MEMBER
-        );
+        const events = await widgetApi.receiveStateEvents(STATE_EVENT_ROOM_MEMBER);
         console.log("events : ", events);
         const usersList = events
           .filter((item) => {
@@ -227,21 +363,15 @@ const MatrixClientProvider = () => {
             return user.userId !== "@tokengatebot:synapse.textrp.io";
           });
 
-        const userIds = usersList.map((member) =>
-          member.userId.split(":")[0].replace("@", "")
-        );
+        const userIds = usersList.map((member) => member.userId.split(":")[0].replace("@", ""));
 
-        const subscribedUsers_ = userIds.filter(
-          (userId) => userId !== myOwnWalletAddress
-        );
+        const subscribedUsers_ = userIds.filter((userId) => userId !== myOwnWalletAddress);
         setSubscribedUsers(subscribedUsers_);
 
         console.log("userIds : ", userIds);
 
-        const own = usersList.find(
-          (u) => u.name === widgetApi.widgetParameters.displayName
-        );
-        const ownWalletAddress = own.userId?.split(":")[0].replace("@", "");
+        const own = usersList.find((u) => u.name === widgetApi.widgetParameters.displayName);
+        const ownWalletAddress = own?.userId?.split(":")[0].replace("@", "");
         console.log("ownWalletAddress : ", ownWalletAddress);
         setMyWalletAddress(ownWalletAddress);
 
@@ -264,7 +394,7 @@ const MatrixClientProvider = () => {
               issuer: collection.issuer,
               nftokenTaxon: collection.nftokenTaxon,
               // 👇 Set the user's NFTs array here
-              nfts: (nftsByKey[collection.collectionKey] || []).map(nft => ({
+              nfts: (nftsByKey[collection.collectionKey] || []).map((nft) => ({
                 ...nft,
                 userName: member.name,
                 userId: member.userId,
@@ -281,47 +411,36 @@ const MatrixClientProvider = () => {
           })
         );
 
-
         console.log("✅ All users with collections:", usersWithCollections);
         setMyNftData(usersWithCollections);
 
         // Preload collection sample images for better UX
         const sampleImages = usersWithCollections
-          .flatMap(user => user.groupedNfts)
-          .map(group => {
-            // Try multiple sources for sample images
+          .flatMap((user) => user.groupedNfts)
+          .map((group) => {
             let sampleImage = null;
 
-            // First priority: direct sampleImage from collection info
             if (group.collectionInfo?.sampleImage) {
               sampleImage = group.collectionInfo.sampleImage;
-            }
-            // Second priority: from sample NFT assets (Bithomp CDN)
-            else if (group.collectionInfo?.sampleNft?.assets?.image) {
+            } else if (group.collectionInfo?.sampleNft?.assets?.image) {
               sampleImage = group.collectionInfo.sampleNft.assets.image;
-            }
-            // Third priority: from sample NFT metadata (IPFS)
-            else if (group.collectionInfo?.sampleNft?.metadata?.image) {
+            } else if (group.collectionInfo?.sampleNft?.metadata?.image) {
               sampleImage = group.collectionInfo.sampleNft.metadata.image;
-            }
-            // Fourth priority: from sample NFT imageURI
-            else if (group.collectionInfo?.sampleNft?.imageURI) {
+            } else if (group.collectionInfo?.sampleNft?.imageURI) {
               sampleImage = group.collectionInfo.sampleNft.imageURI;
             }
 
             return sampleImage;
           })
-          .filter(url => url && url.trim() !== '' && url !== 'undefined' && url !== 'null');
+          .filter((url) => url && url.trim() !== "" && url !== "undefined" && url !== "null");
 
         if (sampleImages.length > 0) {
-          // console.log(`🖼️ Preloading ${sampleImages.length} collection sample images:`, sampleImages);
-          imageCache.preloadImages(sampleImages).catch(error => {
-            console.warn('Failed to preload collection sample images:', error);
+          imageCache.preloadImages(sampleImages).catch((error) => {
+            console.warn("Failed to preload collection sample images:", error);
           });
         } else {
-          console.log('🤔 No sample images found for collections');
+          console.log("🤔 No sample images found for collections");
         }
-
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
@@ -343,13 +462,12 @@ const MatrixClientProvider = () => {
 
     if (nfts && nfts.length > 0) {
       // Update the myNftData state to include the loaded NFTs
-      setMyNftData(prevData =>
-        prevData.map(user => {
+      setMyNftData((prevData) =>
+        prevData.map((user) => {
           if (user.walletAddress === walletAddress) {
             return {
               ...user,
-              groupedNfts: user.groupedNfts.map(group => {
-                // Match by collectionKey, issuer+taxon, or collection name
+              groupedNfts: user.groupedNfts.map((group) => {
                 const isMatch =
                   (issuer && nftokenTaxon && group.issuer === issuer && group.nftokenTaxon === nftokenTaxon) ||
                   group.collection === collectionName;
@@ -358,6 +476,7 @@ const MatrixClientProvider = () => {
                   return {
                     ...group,
                     nfts: nfts,
+                    nftCount: nfts.length, // keep count in sync
                   };
                 }
                 return group;
@@ -384,13 +503,7 @@ const MatrixClientProvider = () => {
   }
 
   useEffect(() => {
-    if (
-      !client ||
-      !myNftData.length ||
-      !myOwnWalletAddress ||
-      !subscribedUsers.length
-    )
-      return;
+    if (!client || !myNftData.length || !myOwnWalletAddress || !subscribedUsers.length) return;
 
     console.log("------------------- client.on-------------------");
     console.log("subscribedUsers : ", subscribedUsers);
@@ -424,94 +537,65 @@ const MatrixClientProvider = () => {
       const validated = tx?.validated;
       if (validated === true) {
         if (
-          (type === "NFTokenCreateOffer" ||
-            type === "NFTokenCancelOffer" ||
-            type === "NFTokenAcceptOffer") &&
+          (type === "NFTokenCreateOffer" || type === "NFTokenCancelOffer" || type === "NFTokenAcceptOffer") &&
           tx?.meta?.TransactionResult === "tesSUCCESS"
         ) {
           console.log("📦 NFT TX Detected:", tx.tx_json);
           if (type === "NFTokenCreateOffer") {
             const offerId = extractOfferIdFromMeta(tx.meta);
-            const isSell =
-              (tx?.tx_json?.Flags &
-                NFTokenCreateOfferFlags.tfSellNFToken) !==
-              0;
+            const isSell = (tx?.tx_json?.Flags & NFTokenCreateOfferFlags.tfSellNFToken) !== 0;
 
             const account = tx?.tx_json?.Account;
             const owner = tx?.tx_json?.Owner;
             const destination = tx?.tx_json?.Destination;
             const amount = tx?.tx_json?.Amount;
             const nftId = tx?.tx_json?.NFTokenID;
-            console.log("myNftData : ", myNftData);
+
             const nft = myNftData
               .flatMap((user) => user.groupedNfts)
               .flatMap((group) => group.nfts)
-              .find((nft) => nft.nftokenID === nftId);
-            console.log("nft : ", nft);
-            console.log(
-              "isSell : ",
-              isSell,
-              "owner : ",
-              owner,
-              "myOwnWalletAddress : ",
-              myOwnWalletAddress
-            );
+              .find((nft) => getNftId(nft) === nftId);
 
             if (amount === "0") {
-              //transfer offer
-              console.log(
-                "Incoming Transfer Offer detected",
-                isSell,
-                destination,
-                myOwnWalletAddress
-              );
+              // transfer offer
               if (isSell && destination === myOwnWalletAddress) {
-                //buy, sell offer
-                console.log("Incoming Transfer Offer detected");
                 const offer = {
                   offer: {
                     offerId: offerId,
                     amount: amount,
                     offerOwner: account,
                     offerOwnerName: allUserNamesByWalletAddress[account],
-                    nftId: nft.nftokenID,
+                    nftId: getNftId(nft),
                     isSell: isSell,
                     destination: destination,
                   },
-                  nft: {
-                    ...nft,
-                  },
+                  nft: { ...nft },
                 };
-
-                console.log("Incoming Offer detected:", offer);
+                console.log("Incoming Transfer Offer detected:", offer);
                 setIncomingOffer(offer);
               }
             } else {
               if (!isSell && owner === myOwnWalletAddress) {
-                //buy, sell offer
-                console.log("Incoming Buy Offer detected");
+                // buy offer on my NFT
                 const offer = {
                   offer: {
                     offerId: offerId,
                     amount: amount,
                     offerOwner: account,
                     offerOwnerName: allUserNamesByWalletAddress[account],
-                    nftId: nft.nftokenID,
+                    nftId: getNftId(nft),
                     isSell: isSell,
                     destination: destination,
                   },
-                  nft: {
-                    ...nft,
-                  },
+                  nft: { ...nft },
                 };
-
-                console.log("Incoming Offer detected:", offer);
+                console.log("Incoming Buy Offer detected:", offer);
                 setIncomingOffer(offer);
               }
             }
           } else if (type === "NFTokenCancelOffer") {
             const offerIds = tx?.tx_json?.NFTokenOffers;
-            if (offerIds.length > 0) {
+            if (offerIds?.length > 0) {
               setCancelledOffer(offerIds);
             }
           } else if (type === "NFTokenAcceptOffer") {
@@ -522,6 +606,7 @@ const MatrixClientProvider = () => {
             let sellerWallet = null;
             let nftId = null;
 
+            // Two acceptance paths
             if (tx?.tx_json?.NFTokenBrokerFee > 15) {
               for (const node of tx.meta.AffectedNodes) {
                 if (
@@ -551,112 +636,21 @@ const MatrixClientProvider = () => {
               sellerWallet = sellOfferNode?.DeletedNode?.FinalFields?.Owner;
               nftId = sellOfferNode?.DeletedNode?.FinalFields?.NFTokenID;
             }
-            console.log(
-              "deatils of the offer",
+
+            console.log("Offer accepted details", {
               sellOfferId,
               buyOfferId,
               buyerWallet,
               sellerWallet,
-              nftId
-            );
+              nftId,
+            });
+
             setCancelledOffer([sellOfferId, buyOfferId]);
 
-            setMyNftData((prevData) => {
-              console.log("✅ Starting update for NFT transfer", {
-                nftId,
-                sellerWallet,
-                buyerWallet,
-              });
-
-              // Step 1: Find the NFT to transfer BEFORE modifying anything
-              const sellerUser = prevData.find(
-                (u) => u.walletAddress === sellerWallet
-              );
-              const nftToTransfer = sellerUser?.groupedNfts
-                .flatMap((group) => group.nfts)
-                .find((nft) => nft.nftokenID === nftId);
-
-              if (!nftToTransfer) {
-                console.warn("❌ NFT to transfer not found");
-                return prevData;
-              }
-
-              const userName = allUserNamesByWalletAddress[buyerWallet];
-              if (userName !== undefined) {
-                nftToTransfer.userName = userName;
-                nftToTransfer.userId = buyerWallet;
-              } else {
-                console.error("Buyer wallet address not found in user names");
-              }
-
-              console.log("🔄 NFT to transfer found:", nftToTransfer);
-
-              const updatedData = prevData.map((user) => {
-                // Step 2: Remove from seller
-                if (user.walletAddress === sellerWallet) {
-                  const updatedGroups = user.groupedNfts
-                    .map((group) => {
-                      const filteredNfts = group.nfts.filter(
-                        (nft) => nft.nftokenID !== nftId
-                      );
-                      if (filteredNfts.length === 0) {
-                        console.log(
-                          `🧹 Removing empty group from seller ${sellerWallet}`,
-                          group.collection
-                        );
-                        return null;
-                      }
-                      return { ...group, nfts: filteredNfts };
-                    })
-                    .filter((group) => group !== null);
-
-                  console.log(
-                    `✅ Updated groups for seller ${sellerWallet}:`,
-                    updatedGroups
-                  );
-
-                  return { ...user, groupedNfts: updatedGroups };
-                }
-
-                // Step 3: Add to buyer
-                else if (user.walletAddress === buyerWallet) {
-                  const existingGroup = user.groupedNfts.find(
-                    (group) => group.collection === nftToTransfer.collectionName
-                  );
-
-                  let newGroupedNfts;
-                  if (existingGroup) {
-                    newGroupedNfts = user.groupedNfts.map((group) =>
-                      group.collection === nftToTransfer.collectionName
-                        ? { ...group, nfts: [...group.nfts, nftToTransfer] }
-                        : group
-                    );
-                    console.log(
-                      `➕ Added NFT to existing group for buyer ${buyerWallet}`
-                    );
-                  } else {
-                    newGroupedNfts = [
-                      ...user.groupedNfts,
-                      {
-                        collection: nftToTransfer.collectionName,
-                        nfts: [nftToTransfer],
-                      },
-                    ];
-                    console.log(
-                      `✨ Created new group and added NFT for buyer ${buyerWallet}`
-                    );
-                  }
-
-                  return { ...user, groupedNfts: newGroupedNfts };
-                }
-
-                // Step 4: Unrelated users remain unchanged
-                return user;
-              });
-
-              console.log("✅ Final updated NFT ownership data:", updatedData);
-              return updatedData;
-            });
+            // ✅ Apply ownership change immutably to refresh MyNFTs & CommunityNFTs
+            setMyNftData((prev) =>
+              applyNftTransfer(prev, { nftId, sellerWallet, buyerWallet })
+            );
           }
         }
       }
@@ -664,83 +658,16 @@ const MatrixClientProvider = () => {
 
     client.on("transaction", listener);
 
-    // Clean up: remove listener when state changes or component unmounts
+    // Clean up listener
     return () => {
       client.off("transaction", listener);
     };
-  }, [client, myNftData, myOwnWalletAddress]); // ✅ dependencies
+  }, [client, myNftData, myOwnWalletAddress, membersList, subscribedUsers]);
 
+  // Keep this helper but make it use the same robust logic
   const updateUsersNFTs = async (nftId, seller, buyer) => {
     console.log("updateUsersNFTs--->", nftId, seller, buyer);
-
-    const selectedUser = myNftData.find(
-      (user) => user.walletAddress === seller
-    );
-
-    const selectedCollection = selectedUser?.groupedNfts.find((group) =>
-      group.nfts.some((nft) => nft.nftokenID === nftId)
-    );
-
-    const selectedNft = selectedCollection?.nfts.find(
-      (nft) => nft.nftokenID === nftId
-    );
-
-    if (!selectedNft) return;
-
-    const updatedMyNftData = myNftData.map((user) => {
-      //Remove NFT from seller
-      if (user.walletAddress === seller) {
-        const updatedCollections = user.groupedNfts
-          .map((collection) => {
-            if (collection.nfts.some((nft) => nft.nftokenID === nftId)) {
-              const remainingNfts = collection.nfts.filter(
-                (nft) => nft.nftokenID !== nftId
-              );
-              if (remainingNfts.length === 0) return null; //Remove empty collection
-              return { ...collection, nfts: remainingNfts };
-            }
-            return collection;
-          })
-          .filter(Boolean); //Remove null entries
-
-        return {
-          ...user,
-          groupedNfts: updatedCollections,
-        };
-      }
-
-      //Add NFT to buyer
-      else if (user.walletAddress === buyer) {
-        const hasCollection = user.groupedNfts.some(
-          (collection) => collection.collection === selectedNft.collectionName
-        );
-
-        return {
-          ...user,
-          groupedNfts: hasCollection
-            ? user.groupedNfts.map((collection) => {
-              if (collection.collection === selectedNft.collectionName) {
-                return {
-                  ...collection,
-                  nfts: [...collection.nfts, selectedNft],
-                };
-              }
-              return collection;
-            })
-            : [
-              ...user.groupedNfts,
-              {
-                collection: selectedNft.collectionName,
-                nfts: [selectedNft],
-              },
-            ],
-        };
-      }
-      // Other users remain unchanged
-      return user;
-    });
-    console.log("✅ updatedMyNftData--->", updatedMyNftData);
-    setMyNftData(updatedMyNftData); // <- Apply state change
+    setMyNftData((prev) => applyNftTransfer(prev, { nftId, sellerWallet: seller, buyerWallet: buyer }));
   };
 
   return (
