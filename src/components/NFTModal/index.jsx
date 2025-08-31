@@ -768,7 +768,7 @@ const NFTModal = ({
 
       <TransactionModal
         isOpen={isQrModalVisible}
-        onClose={() => closeQrModal("Cancelled", "Transaction flow cancelled.")}
+        onClose={() => closeQrModal("Cancelled", "Transaction flow cancelled.", "info")}
         qrCodeUrl={qrCodeUrl}
         transactionStatus={transactionStatus}
       />
