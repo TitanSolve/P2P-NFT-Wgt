@@ -36,8 +36,8 @@ const Offers = ({
     // From membersList
     membersList?.forEach((m) => {
       const addr =
-        m.walletAddress?.trim() || m.wallet?.trim() || m.address?.trim();
-      const name = m.displayName || m.name || m.userId;
+        m.userId?.split(":")[0]?.replace("@", "");
+      const name = m.name ;
       if (addr) map.set(addr, name);
     });
 
