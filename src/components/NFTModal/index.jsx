@@ -165,13 +165,13 @@ const NFTModal = ({
 
     ws.onerror = () => {
       // Treat errors as a cancelled flow but don't spam
-      closeQrModal("Connection error", "Wallet connection error. Please try again.");
+      closeQrModal("Connection error", /*"Wallet connection error. Please try again."*/ "");
     };
 
     ws.onclose = () => {
       // If the QR modal is still open with no resolution, close gracefully
       if (isQrModalVisible) {
-        closeQrModal("Connection closed", "Wallet connection closed.");
+        closeQrModal("Connection closed", /*"Wallet connection closed."*/ "");
       }
     };
 
