@@ -148,7 +148,7 @@ const OfferReceivedCard = ({
             setMessageBoxType("success");
             setMessageBoxText("Offer finished successfully");
             setSendRoomMsg(true);
-            onAction();
+            // onAction();
             updateUsersNFTs(
               buyOffer.nft.nftokenID,
               sellOfferOwner,
@@ -254,7 +254,7 @@ const OfferReceivedCard = ({
         }
 
         console.log(data.refs, "data refs");
-        onAction();
+        // onAction();
       }
     } catch (error) {
       console.error("Error during fetch:", error);
@@ -342,7 +342,7 @@ const OfferReceivedCard = ({
             setMessageBoxType("success");
             setMessageBoxText("Offer finished successfully");
             setSendRoomMsg(true);
-            onAction();
+            // onAction();
             updateUsersNFTs(
               buyOffer.nft.nftokenID,
               sellOfferOwner,
@@ -387,7 +387,7 @@ const OfferReceivedCard = ({
           // console.log("deduction result:", response);
           setTransactionStatus("Transaction signed");
           setIsQrModalVisible(false);
-          onAction(); //refresh
+          // onAction(); //refresh
         } else if (data.rejected) {
           setTransactionStatus("Transaction rejected");
         }
@@ -431,7 +431,7 @@ const OfferReceivedCard = ({
 
   function handleCloseMessageBox() {
     setIsMessageBoxVisible(false);
-    onAction();
+    // onAction();
   }
 
   return (
