@@ -313,6 +313,8 @@ const NFTModal = ({
       account: myWalletAddress,
       owner: nft.owner,
     };
+    console.log("NFT data:", nft);
+    console.log("Buy offer payload:", payload);
 
     try {
       setIsLoading(true);
