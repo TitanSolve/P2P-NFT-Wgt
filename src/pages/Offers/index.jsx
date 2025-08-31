@@ -30,6 +30,7 @@ const Offers = ({
 
   // ---------- Address -> Name resolver ----------
   const addressToName = useMemo(() => {
+    console.log("memberList", membersList);
     const map = new Map();
 
     // From membersList
