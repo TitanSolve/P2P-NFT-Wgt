@@ -46,11 +46,10 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
   try {
     const sellerIdx = prevData.findIndex((u) => u.walletAddress === sellerWallet);
     if (sellerIdx === -1) return prevData;
-
     const seller = prevData[sellerIdx];
     if (!seller?.groupedNfts?.length) return prevData;
 
-    // Find the NFT + its seller group
+    // 1) Find NFT & its group under the seller
     let foundGroupIdx = -1;
     let foundNftIdx = -1;
     for (let gi = 0; gi < seller.groupedNfts.length; gi++) {
@@ -66,10 +65,9 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
     if (foundGroupIdx === -1 || foundNftIdx === -1) return prevData;
 
     const sellerGroup = seller.groupedNfts[foundGroupIdx];
-    const nftToTransfer = sellerGroup.nfts[foundNftIdx];
-    const moved = { ...nftToTransfer }; // immutable copy
+    const original = sellerGroup.nfts[foundNftIdx];
 
-    // Remove NFT from seller group (and drop empty groups)
+    // 2) Remove from seller
     const newSellerGroupNfts = sellerGroup.nfts.filter((n) => getNftId(n) !== nftId);
     const newSellerGroup =
       newSellerGroupNfts.length > 0
@@ -82,24 +80,32 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
             ),
           }
         : null;
-
     const newSellerGroups = [
       ...seller.groupedNfts.slice(0, foundGroupIdx),
       ...(newSellerGroup ? [newSellerGroup] : []),
       ...seller.groupedNfts.slice(foundGroupIdx + 1),
     ];
 
-    // If buyer not present in room, just update seller removal
+    // 3) Resolve buyer user
     const buyerIdx = prevData.findIndex((u) => u.walletAddress === buyerWallet);
     if (buyerIdx === -1) {
+      // Buyer not in room; still remove from seller so UI won’t show old owner
       return prevData.map((u, i) =>
         i === sellerIdx ? { ...seller, groupedNfts: newSellerGroups } : u
       );
     }
-
     const buyer = prevData[buyerIdx];
 
-    // Derive collection key/name for the NFT being moved
+    // 4) Build a moved copy and UPDATE owner fields to buyer
+    const moved = {
+      ...original,
+      ownerWallet: buyerWallet,
+      ownerName: buyer.name,
+      userName: buyer.name,
+      userId: buyer.userId,
+    };
+
+    // 5) Determine grouping metadata
     const issuer = moved.issuer ?? sellerGroup.issuer ?? null;
     const taxon = moved.nftokenTaxon ?? sellerGroup.nftokenTaxon ?? null;
     const collectionKey =
@@ -114,7 +120,7 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
       sellerGroup?.collection ||
       `Collection ${taxon ?? "Unknown"}`;
 
-    // Try to find matching buyer group by key (preferred) or fallback by name
+    // 6) Insert into buyer group (match by key/issuer+taxon/name)
     const buyerGroupIdx = (buyer.groupedNfts || []).findIndex(
       (g) =>
         g.collectionKey === collectionKey ||
@@ -136,7 +142,7 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
         ...buyer.groupedNfts.slice(buyerGroupIdx + 1),
       ];
     } else {
-      // Create a new buyer group with complete metadata
+      // Create new group with proper collectionInfo
       const sampleImage =
         moved?.assets?.image ||
         moved?.metadata?.image ||
@@ -146,7 +152,7 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
 
       const collectionInfo =
         sellerGroup?.collectionInfo
-          ? { ...sellerGroup.collectionInfo, sampleImage }
+          ? { ...sellerGroup.collectionInfo, sampleImage, name: collectionName, issuer, nftokenTaxon: taxon, collectionKey }
           : {
               name: collectionName,
               issuer,
@@ -169,7 +175,7 @@ function applyNftTransfer(prevData, { nftId, sellerWallet, buyerWallet }) {
       newBuyerGroups = [...(buyer.groupedNfts || []), newGroup];
     }
 
-    // Build final immutable array
+    // 7) Return updated state
     return prevData.map((u, i) => {
       if (i === sellerIdx) return { ...seller, groupedNfts: newSellerGroups };
       if (i === buyerIdx) return { ...buyer, groupedNfts: newBuyerGroups };
