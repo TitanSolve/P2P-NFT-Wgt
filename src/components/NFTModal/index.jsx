@@ -483,7 +483,7 @@ const NFTModal = ({
             <div className="p-5 overflow-y-auto">
               <div className="relative bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden ring-1 ring-gray-200 dark:ring-gray-800">
                 <img
-                  src={cachedImageSrc}
+                  src={cachedImageSrc || nft_pic}
                   alt={nft.metadata?.name || "NFT"}
                   className={`w-full h-72 lg:h-80 object-cover transition-opacity duration-500 ${isLoaded ? "opacity-100" : "opacity-0"
                     }`}
