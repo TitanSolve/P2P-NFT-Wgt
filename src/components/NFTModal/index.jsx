@@ -252,7 +252,7 @@ const NFTModal = ({
 
     const offerAmount =
       currency === "XRP"
-        ? amount
+        ? (parseFloat(amount) + 0.000012).toFixed(6)
         : {
           currency,
           value: String(parseFloat(amount)),
