@@ -31,7 +31,7 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
     console.log("Cancel clicked for item:", sellOffer);
     try {
       console.log("Cancel offer request:", sellOffer, 'brokerWalletAddress:', API_URLS.brokerWalletAddress);
-      if (sellOffer.offer.destination === API_URLS.brokerWalletAddress) {
+      if (sellOffer.offer.destination !== API_URLS.brokerWalletAddress) {
         const requestBody = {
           owner: myWalletAddress,
           account: sellOffer.offer.offerOwner,
