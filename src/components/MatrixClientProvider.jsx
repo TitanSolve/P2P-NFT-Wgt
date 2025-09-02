@@ -601,53 +601,57 @@ const MatrixClientProvider = () => {
             const offerId = extractOfferIdFromMeta(tx.meta);
             const isSell = (tx?.tx_json?.Flags & NFTokenCreateOfferFlags.tfSellNFToken) !== 0;
 
-            const account = tx?.tx_json?.Account;
-            const owner = tx?.tx_json?.Owner;
-            const destination = tx?.tx_json?.Destination;
-            const amount = tx?.tx_json?.Amount;
+            const account = tx?.tx_json?.Account;      // offer creator
+            const owner = tx?.tx_json?.Owner || null;        // owner of NFT (present for BUY offers)
+            const destination = tx?.tx_json?.Destination || null;  // directed buyer (optional)
+            const amount = tx?.tx_json?.Amount;                // "0" (transfer) or priced (string/object)
             const nftId = tx?.tx_json?.NFTokenID;
 
-            const nft = myNftData
+            // Try to attach the NFT object from in-memory state (room data)
+            let nft = myNftData
               .flatMap((user) => user.groupedNfts)
               .flatMap((group) => group.nfts)
-              .find((nft) => getNftId(nft) === nftId);
+              .find((n) => getNftId(n) === nftId);
 
-            if (amount === "0") {
-              // transfer offer
-              if (isSell && destination === myOwnWalletAddress) {
-                const offer = {
-                  offer: {
-                    offerId: offerId,
-                    amount: amount,
-                    offerOwner: account,
-                    offerOwnerName: allUserNamesByWalletAddress[account],
-                    nftId: getNftId(nft),
-                    isSell: isSell,
-                    destination: destination,
-                  },
-                  nft: { ...nft },
-                };
-                console.log("Incoming Transfer Offer detected:", offer);
-                setIncomingOffer(offer);
-              }
-            } else {
-              if (!isSell && owner === myOwnWalletAddress) {
-                // buy offer on my NFT
-                const offer = {
-                  offer: {
-                    offerId: offerId,
-                    amount: amount,
-                    offerOwner: account,
-                    offerOwnerName: allUserNamesByWalletAddress[account],
-                    nftId: getNftId(nft),
-                    isSell: isSell,
-                    destination: destination,
-                  },
-                  nft: { ...nft },
-                };
-                console.log("Incoming Buy Offer detected:", offer);
-                setIncomingOffer(offer);
-              }
+            // Fallback placeholder if not yet loaded
+            if (!nft) {
+              nft = { NFTokenID: nftId, nftokenID: nftId };
+            }
+
+            // ✅ CASE A: Directed SELL offer to ME (covers both transfer "0" and priced sells)
+            if (isSell && destination === myOwnWalletAddress) {
+              const offer = {
+                offer: {
+                  offerId,
+                  amount,                                 // could be "0" or priced (drops or IOU object)
+                  offerOwner: account,                    // seller address
+                  offerOwnerName: allUserNamesByWalletAddress[account],
+                  nftId: getNftId(nft),
+                  isSell: true,
+                  destination,                            // me
+                },
+                nft: { ...nft },
+              };
+              console.log("Incoming directed SELL offer for me:", offer);
+              setIncomingOffer(offer);
+            }
+
+            // ✅ CASE B: BUY offer on MY NFT (someone offering to buy what I own)
+            else if (!isSell && owner === myOwnWalletAddress) {
+              const offer = {
+                offer: {
+                  offerId,
+                  amount,
+                  offerOwner: account,                    // buyer address
+                  offerOwnerName: allUserNamesByWalletAddress[account],
+                  nftId: getNftId(nft),
+                  isSell: false,
+                  destination,                            // often undefined for BUY offers; harmless
+                },
+                nft: { ...nft },
+              };
+              console.log("Incoming BUY offer on my NFT:", offer);
+              setIncomingOffer(offer);
             }
           } else if (type === "NFTokenCancelOffer") {
             const offerIds = tx?.tx_json?.NFTokenOffers;
