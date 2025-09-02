@@ -405,7 +405,7 @@ const Offers = ({
                     nftokenID: offer.nftokenID,
                     metadata: nftData.metadata || offer.nftoken?.metadata,
                     imageURI:
-                      nftData.imageURI || offer.nftoken?.metadata?.image,
+                      nftData?.assets?.preview || offer.nftoken?.metadata?.image,
                     name:
                       nftData.name || offer.nftoken?.metadata?.name,
                   }
@@ -448,7 +448,7 @@ const Offers = ({
                       metadata:
                         nftData.metadata || offer.nftoken?.metadata,
                       imageURI:
-                        nftData.imageURI ||
+                        nftData?.assets?.preview ||
                         offer.nftoken?.metadata?.image,
                       name:
                         nftData.name || offer.nftoken?.metadata?.name,
@@ -493,7 +493,7 @@ const Offers = ({
                       metadata:
                         nftData.metadata || offer.nftoken?.metadata,
                       imageURI:
-                        nftData.imageURI ||
+                        nftData?.assets?.preview ||
                         offer.nftoken?.metadata?.image,
                       name:
                         nftData.name || offer.nftoken?.metadata?.name,
