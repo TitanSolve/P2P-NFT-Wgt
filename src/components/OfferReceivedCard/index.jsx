@@ -62,7 +62,7 @@ const OfferReceivedCard = ({
       const requestBody = {
         address: myWalletAddress,
         OfferId: buyOffer.offer.offerId,
-        buyOrSell: 1,
+        buyOrSell: 0,
       };
       try {
         const response = await fetch(`${API_URLS.backendUrl}/accept-offer`, {
