@@ -20,8 +20,7 @@ const OfferReceivedCard = ({
 }) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [websocketUrl, setWebsocketUrl] = useState("");
-  const [websocketAutoMakeSellOfferUrl, setWebsocketAutoMakeSellOfferUrl] =
-    useState("");
+  const [websocketAutoMakeSellOfferUrl, setWebsocketAutoMakeSellOfferUrl] = useState("");
   const [transactionStatus, setTransactionStatus] = useState("");
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
   const [madeOffers, setMadeOffers] = useState([]);
@@ -455,7 +454,11 @@ const OfferReceivedCard = ({
                 </span>
               </p>
               <p className="text-gray-700 dark:text-gray-300">
-                Buyer's Name:{" "}
+                {buyOffer.isSell ? (
+                  <span> Seller's Name:{" "}</span>
+                ) : (
+                  <span> Buyer's Name:{" "}</span>
+                )}
                 <span className="font-mono break-all">
                   {buyOffer.offer.offerOwnerName}
                 </span>
@@ -475,7 +478,12 @@ const OfferReceivedCard = ({
                 className="px-5 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <Check className="w-4 h-4" />
-                Accept
+                {buyOffer.isSell ? (
+                  Buy
+                ) : (
+                  Accept
+                )}
+                
               </button>
               <button
                 onClick={onCancelOffer}
