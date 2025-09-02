@@ -158,7 +158,7 @@ const NFTModal = ({
 
       // Extra guards for alternate shapes
       if (msg?.cancelled || msg?.canceled || msg?.expired) {
-        closeQrModal("Transaction cancelled", "Transaction was cancelled/expired.");
+        closeQrModal("Transaction cancelled", /*"Transaction was cancelled/expired."*/ );
         return;
       }
     };
