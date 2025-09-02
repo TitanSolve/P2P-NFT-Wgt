@@ -7,6 +7,10 @@ import NFTMessageBox from "../NFTMessageBox";
 import { DollarSign, User, X } from "lucide-react";
 
 const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [websocketUrl, setWebsocketUrl] = useState("");
+  const [transactionStatus, setTransactionStatus] = useState("");
+  const [isQrModalVisible, setIsQrModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMessageBoxVisible, setIsMessageBoxVisible] = useState(false);
   const [messageBoxType, setMessageBoxType] = useState("success");
@@ -25,57 +29,118 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
 
   async function onCancelOffer() {
     console.log("Cancel clicked for item:", sellOffer);
-    const requestBody = {
-      owner: myWalletAddress,
-      // account: sellOffer.offer.offerOwner,
-      offerId: sellOffer.offer.offerId,
-    };
     try {
-      setIsLoading(true);
-      const response = await fetch(`${API_URLS.backendUrl}/cancel-nft-offer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-      console.log(requestBody, "requestBody");
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log(data, "data received from server");
-
-      if (data?.result === "NotEnoughCredit") {
-        setMessageBoxType("error");
-        setMessageBoxText(
-          "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
-        );3
-        setIsMessageBoxVisible(true);
-        return;
-      }
-
-      setIsLoading(false);
-      if (data.result.meta.TransactionResult === "tesSUCCESS") {
-        console.log(data, "returned data");
-        setMessageBoxType("success");
-        setMessageBoxText("Offer cancelled successfully.");
-        setIsMessageBoxVisible(true);
-        // onAction();
-      } else {
-        console.log("No data received from the server.");
-        setMessageBoxType("error");
-        setMessageBoxText(
-          "Failed to cancel the offer. \nPlease try again.\n error: " +
-            data.result.meta.TransactionResult
+      if (sellOffer.offer.destination === API_URLS.brokerWalletAddress) {
+        const requestBody = {
+          owner: myWalletAddress,
+          account: sellOffer.offer.offerOwner,
+          offerId: sellOffer.offer.offerId,
+        };
+        const response = await fetch(
+          `${API_URLS.backendUrl}/cancel-nft-offer-with-sign`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          }
         );
-        setIsMessageBoxVisible(true);
+        console.log(requestBody, "requestBody");
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data) {
+          if (data?.result === "NotEnoughCredit") {
+            setMessageBoxType("error");
+            setMessageBoxText(
+              "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
+            );
+            setIsMessageBoxVisible(true);
+            return;
+          }
+
+          console.log(data.refs, "data refs");
+          setQrCodeUrl(data.refs.qr_png);
+          setWebsocketUrl(data.refs.websocket_status);
+          setIsQrModalVisible(true);
+        }
+      }
+      else {
+        setIsLoading(true);
+        const requestBody = {
+          owner: myWalletAddress,
+          offerId: sellOffer.offer.offerId,
+        };
+        const response = await fetch(`${API_URLS.backendUrl}/cancel-nft-offer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        console.log(requestBody, "requestBody");
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log(data, "data received from server");
+
+        if (data?.result === "NotEnoughCredit") {
+          setMessageBoxType("error");
+          setMessageBoxText(
+            "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
+          ); 3
+          setIsMessageBoxVisible(true);
+          return;
+        }
+
+        setIsLoading(false);
+        if (data.result.meta.TransactionResult === "tesSUCCESS") {
+          console.log(data, "returned data");
+          setMessageBoxType("success");
+          setMessageBoxText("Offer cancelled successfully.");
+          setIsMessageBoxVisible(true);
+          // onAction();
+        } else {
+          console.log("No data received from the server.");
+          setMessageBoxType("error");
+          setMessageBoxText(
+            "Failed to cancel the offer. \nPlease try again.\n error: " +
+            data.result.meta.TransactionResult
+          );
+          setIsMessageBoxVisible(true);
+        }
       }
     } catch (error) {
       console.error("Error during fetch:", error);
     }
   }
+
+  useEffect(() => {
+    if (websocketUrl) {
+      const ws = new WebSocket(websocketUrl);
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.signed) {
+          setTransactionStatus("Transaction signed");
+          setIsQrModalVisible(false);
+        } else if (data.signed === false) {
+          setIsQrModalVisible(false);
+          ws.close();
+        } else if (data.rejected) {
+          setTransactionStatus("Transaction rejected");
+        }
+      };
+      return () => {
+        ws.close();
+      };
+    }
+  }, [websocketUrl]);
 
   return (
     <>
@@ -92,11 +157,10 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
                 className="w-48 h-48 rounded-2xl object-cover shadow-lg border border-gray-200/50 dark:border-gray-700/50"
               />
               <div className="absolute -top-2 -right-2">
-                <div className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                  sellOffer.offer.isSell 
-                    ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800' 
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-                }`}>
+                <div className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${sellOffer.offer.isSell
+                  ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800'
+                  : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                  }`}>
                   <span className="w-2 h-2 bg-current rounded-full mr-1.5 inline-block"></span>
                   {sellOffer.offer.isSell ? "Sell Offer" : "Buy Offer"}
                 </div>
@@ -152,6 +216,12 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
               </button>
             </div>
           </div>
+          <TransactionModal
+            isOpen={isQrModalVisible}
+            onClose={() => setIsQrModalVisible(false)}
+            qrCodeUrl={qrCodeUrl}
+            transactionStatus={transactionStatus}
+          />
           <NFTMessageBox
             isOpen={isMessageBoxVisible}
             onClose={() => setIsMessageBoxVisible(false)}
