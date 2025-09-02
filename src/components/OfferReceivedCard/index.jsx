@@ -21,6 +21,7 @@ const OfferReceivedCard = ({
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [websocketUrl, setWebsocketUrl] = useState("");
   const [websocketAutoMakeSellOfferUrl, setWebsocketAutoMakeSellOfferUrl] = useState("");
+  const [websocketAcceptIncomingSellOfferUrl, setWebsocketAcceptIncomingSellOfferUrl] = useState("");
   const [transactionStatus, setTransactionStatus] = useState("");
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
   const [madeOffers, setMadeOffers] = useState([]);
@@ -55,147 +56,34 @@ const OfferReceivedCard = ({
     console.log("Accept clicked for item:", buyOffer);
     console.log("SellOffer--->", madeOffers);
 
-    setIsLoading(true);
-    setTransactionStatus("");
+    if (buyOffer.offer.isSell === true) {
+      setIsLoading(true);
 
-    let isOfferFound = false;
-    let sellOfferIndex = "";
-    let brokerFee = (((buyOffer.offer.amount * 1 - 12) / 1.01) * 0.01).toFixed(
-      0
-    );
-    let sellOfferOwner = "";
-    for (const offer of madeOffers) {
-      console.log("offer--->", offer);
-      if (offer.nft.nftokenID === buyOffer.nft.nftokenID) {
-        isOfferFound = true;
-        sellOfferIndex = offer.offer.offerId;
-        brokerFee = (((buyOffer.offer.amount * 1 - 12) / 1.01) * 0.01).toFixed(
-          0
-        );
-        sellOfferOwner = offer.offer.offerOwner;
-        console.log(
-          "brokerFee--->",
-          brokerFee,
-          buyOffer.offer.amount,
-          offer.offer.amount
-        );
-        break;
-      }
-    }
-    if (isOfferFound) {
       const requestBody = {
-        owner: myWalletAddress,
-        nftId: buyOffer.nft.nftokenID,
-        buyOfferId: buyOffer.offer.offerId,
-        sellOfferId: sellOfferIndex,
-        brokerFee: brokerFee,
+        address: myWalletAddress,
+        OfferId: buyOffer.offer.offerId,
+        buyOrSell: 1,
       };
-      console.log("requestBody--->", requestBody);
-
-      let strAmount = "";
-      let strCurrency = "";
-      if (typeof buyOffer.offer.amount === "string") {
-        strAmount = (
-          (buyOffer.offer.amount * 1 - 12) /
-          1000000
-        ).toString();
-        strCurrency = "XRP";
-      } else {
-        strAmount = buyOffer.offer.amount.amount;
-        strCurrency = buyOffer.offer.amount.currency;
-      }
-
-      const msg = `🔔NFT Accept Offer Created\n${buyOffer.offer.offerOwnerName} purchased ${buyOffer.nft.metadata.name} from ${myDisplayName} for ${strAmount} ${strCurrency}`;
-      console.log("msg-->", msg);
-      setRommMessage(msg);
-
       try {
-        const response = await fetch(
-          `${API_URLS.backendUrl}/broker-accept-offer`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(requestBody),
-          }
-        );
+        const response = await fetch(`${API_URLS.backendUrl}/accept-offer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
         console.log(requestBody, "requestBody");
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        console.log("response", response);
+        // const msg = `🔔NFT Accept Transfer Offer Created\n${myDisplayName} accepted transfer offer from ${transfer.offer.offerOwnerName} for ${transfer.nft.metadata.name}`;
+        // console.log("msg-->", msg);
+        // setRommMessage(msg);
+        // setSendRoomMsg(false);
 
         const data = await response.json();
-        setIsLoading(false);
-        setSendRoomMsg(false);
-        if (data) {
-          console.log(data, "data");
-
-          if (data?.result === "NotEnoughCredit") {
-            setMessageBoxType("error");
-            setMessageBoxText(
-              "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
-            );
-            setIsMessageBoxVisible(true);
-            return;
-          }
-
-          if (data.result.meta.TransactionResult === "tesSUCCESS") {
-            setMessageBoxType("success");
-            setMessageBoxText("Offer finished successfully");
-            setSendRoomMsg(true);
-            // onAction();
-            updateUsersNFTs(
-              buyOffer.nft.nftokenID,
-              sellOfferOwner,
-              buyOffer.offer.offerOwner
-            );
-          } else {
-            setMessageBoxType("error");
-            setMessageBoxText(data.result.meta.TransactionResult);
-          }
-          setIsMessageBoxVisible(true);
-        }
-      } catch (error) {
-        console.error("Error during fetch:", error);
-      }
-    } else {
-      console.log("No matching offer found for the selected NFT.");
-      let sellAmount = "0";
-      sellAmount = (
-        (buyOffer.offer.amount * 1 - 12) /
-        1000000
-      ).toString();
-
-      const payload = {
-        nft: buyOffer.nft.nftokenID,
-        amount: sellAmount,
-        receiver: "all",
-        sender: myWalletAddress,
-      };
-      console.log("payload for sell", payload);
-      try {
-        const response = await fetch(
-          `${API_URLS.backendUrl}/create-nft-offer`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        setIsLoading(false);
-        const data = await response.json();
-        console.log("Offer created:", response);
         if (data) {
           if (data?.result === "NotEnoughCredit") {
             setMessageBoxType("error");
@@ -208,11 +96,174 @@ const OfferReceivedCard = ({
 
           console.log(data.refs, "data refs");
           setQrCodeUrl(data.refs.qr_png);
+          setWebsocketAcceptIncomingSellOfferUrl(data.refs.websocket_status);
           setIsQrModalVisible(true);
-          setWebsocketAutoMakeSellOfferUrl(data.refs.websocket_status);
         }
       } catch (error) {
-        console.error("Error creating offer:", error);
+        console.error("Error during fetch:", error);
+      }
+
+
+    } else {
+      setIsLoading(true);
+      setTransactionStatus("");
+
+      let isOfferFound = false;
+      let sellOfferIndex = "";
+      let brokerFee = (((buyOffer.offer.amount * 1 - 12) / 1.01) * 0.01).toFixed(
+        0
+      );
+      let sellOfferOwner = "";
+      for (const offer of madeOffers) {
+        console.log("offer--->", offer);
+        if (offer.nft.nftokenID === buyOffer.nft.nftokenID) {
+          isOfferFound = true;
+          sellOfferIndex = offer.offer.offerId;
+          brokerFee = (((buyOffer.offer.amount * 1 - 12) / 1.01) * 0.01).toFixed(
+            0
+          );
+          sellOfferOwner = offer.offer.offerOwner;
+          console.log(
+            "brokerFee--->",
+            brokerFee,
+            buyOffer.offer.amount,
+            offer.offer.amount
+          );
+          break;
+        }
+      }
+      if (isOfferFound) {
+        const requestBody = {
+          owner: myWalletAddress,
+          nftId: buyOffer.nft.nftokenID,
+          buyOfferId: buyOffer.offer.offerId,
+          sellOfferId: sellOfferIndex,
+          brokerFee: brokerFee,
+        };
+        console.log("requestBody--->", requestBody);
+
+        let strAmount = "";
+        let strCurrency = "";
+        if (typeof buyOffer.offer.amount === "string") {
+          strAmount = (
+            (buyOffer.offer.amount * 1 - 12) /
+            1000000
+          ).toString();
+          strCurrency = "XRP";
+        } else {
+          strAmount = buyOffer.offer.amount.amount;
+          strCurrency = buyOffer.offer.amount.currency;
+        }
+
+        const msg = `🔔NFT Accept Offer Created\n${buyOffer.offer.offerOwnerName} purchased ${buyOffer.nft.metadata.name} from ${myDisplayName} for ${strAmount} ${strCurrency}`;
+        console.log("msg-->", msg);
+        setRommMessage(msg);
+
+        try {
+          const response = await fetch(
+            `${API_URLS.backendUrl}/broker-accept-offer`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
+            }
+          );
+          console.log(requestBody, "requestBody");
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          console.log("response", response);
+
+          const data = await response.json();
+          setIsLoading(false);
+          setSendRoomMsg(false);
+          if (data) {
+            console.log(data, "data");
+
+            if (data?.result === "NotEnoughCredit") {
+              setMessageBoxType("error");
+              setMessageBoxText(
+                "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
+              );
+              setIsMessageBoxVisible(true);
+              return;
+            }
+
+            if (data.result.meta.TransactionResult === "tesSUCCESS") {
+              setMessageBoxType("success");
+              setMessageBoxText("Offer finished successfully");
+              setSendRoomMsg(true);
+              // onAction();
+              updateUsersNFTs(
+                buyOffer.nft.nftokenID,
+                sellOfferOwner,
+                buyOffer.offer.offerOwner
+              );
+            } else {
+              setMessageBoxType("error");
+              setMessageBoxText(data.result.meta.TransactionResult);
+            }
+            setIsMessageBoxVisible(true);
+          }
+        } catch (error) {
+          console.error("Error during fetch:", error);
+        }
+      } else {
+        console.log("No matching offer found for the selected NFT.");
+        let sellAmount = "0";
+        sellAmount = (
+          (buyOffer.offer.amount * 1 - 12) /
+          1000000
+        ).toString();
+
+        const payload = {
+          nft: buyOffer.nft.nftokenID,
+          amount: sellAmount,
+          receiver: "all",
+          sender: myWalletAddress,
+        };
+        console.log("payload for sell", payload);
+        try {
+          const response = await fetch(
+            `${API_URLS.backendUrl}/create-nft-offer`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          setIsLoading(false);
+          const data = await response.json();
+          console.log("Offer created:", response);
+          if (data) {
+            if (data?.result === "NotEnoughCredit") {
+              setMessageBoxType("error");
+              setMessageBoxText(
+                "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
+              );
+              setIsMessageBoxVisible(true);
+              return;
+            }
+
+            console.log(data.refs, "data refs");
+            setQrCodeUrl(data.refs.qr_png);
+            setIsQrModalVisible(true);
+            setWebsocketAutoMakeSellOfferUrl(data.refs.websocket_status);
+          }
+        } catch (error) {
+          console.error("Error creating offer:", error);
+        }
       }
     }
   }
@@ -221,39 +272,80 @@ const OfferReceivedCard = ({
     console.log("Cancel clicked for item:", buyOffer);
     setTransactionStatus("");
     setIsLoading(true);
-    const requestBody = {
-      owner: myWalletAddress,
-      // account: buyOffer.offer.offerOwner,
-      offerId: buyOffer.offer.offerId,
-    };
+
+
     try {
-      const response = await fetch(`${API_URLS.backendUrl}/cancel-nft-offer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-      console.log(requestBody, "requestBody");
+      if (buyOffer?.offer?.isSell !== true) { //Received Buy Offer
+        const requestBody = {
+          owner: myWalletAddress,
+          // account: buyOffer.offer.offerOwner,
+          offerId: buyOffer.offer.offerId,
+        };
+        const response = await fetch(`${API_URLS.backendUrl}/cancel-nft-offer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        console.log(requestBody, "requestBody");
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setIsLoading(false);
-      if (data) {
-        if (data?.result === "NotEnoughCredit") {
-          setMessageBoxType("error");
-          setMessageBoxText(
-            "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
-          );
-          setIsMessageBoxVisible(true);
-          return;
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        console.log(data.refs, "data refs");
-        // onAction();
+        const data = await response.json();
+        setIsLoading(false);
+        if (data) {
+          if (data?.result === "NotEnoughCredit") {
+            setMessageBoxType("error");
+            setMessageBoxText(
+              "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
+            );
+            setIsMessageBoxVisible(true);
+            return;
+          }
+
+          console.log(data.refs, "data refs");
+          // onAction();
+        }
+      } else {  //Received Sell Offer
+        const requestBody = {
+          owner: myWalletAddress,
+          account: buyOffer.offer.offerOwner,
+          offerId: buyOffer.offer.offerId,
+        };
+        const response = await fetch(`${API_URLS.backendUrl}/cancel-nft-offer-with-sign`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        console.log(requestBody, "requestBody");
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setIsLoading(false);
+
+        if (data) {
+          if (data?.result === "NotEnoughCredit") {
+            setMessageBoxType("error");
+            setMessageBoxText(
+              "You don't have enough mCredits to create this offer.\nPlease buy more mCredits."
+            );
+            setIsMessageBoxVisible(true);
+            return;
+          }
+
+          console.log(data.refs, "data refs");
+          setQrCodeUrl(data.refs.qr_png);
+          setWebsocketUrl(data.refs.websocket_status);
+          setIsQrModalVisible(true);
+        }
       }
     } catch (error) {
       console.error("Error during fetch:", error);
@@ -366,6 +458,25 @@ const OfferReceivedCard = ({
     console.log("done refreshSellOffers", refreshedSellOffers);
     onAcceptAutoMakeSellOfferOffer(refreshedSellOffers);
   }
+
+  useEffect(() => {
+    if (websocketAcceptIncomingSellOfferUrl) {
+      const ws = new WebSocket(websocketAcceptIncomingSellOfferUrl);
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.signed) {
+          setTransactionStatus("Transaction signed");
+          setIsQrModalVisible(false);
+          // onAction(); //refresh
+        } else if (data.rejected) {
+          setTransactionStatus("Transaction rejected");
+        }
+      };
+      return () => {
+        ws.close();
+      };
+    }
+  }, [websocketAcceptIncomingSellOfferUrl]);
 
   useEffect(() => {
     if (websocketUrl) {
