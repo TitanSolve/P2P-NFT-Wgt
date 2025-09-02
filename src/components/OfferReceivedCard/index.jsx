@@ -454,7 +454,7 @@ const OfferReceivedCard = ({
                 </span>
               </p>
               <p className="text-gray-700 dark:text-gray-300">
-                {buyOffer.isSell ? (
+                {buyOffer?.offer?.isSell === true ? (
                   <span> Seller's Name:{" "}</span>
                 ) : (
                   <span> Buyer's Name:{" "}</span>
@@ -478,12 +478,12 @@ const OfferReceivedCard = ({
                 className="px-5 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <Check className="w-4 h-4" />
-                {buyOffer.isSell ? (
-                  Buy
+                {buyOffer?.offer?.isSell === true ? (
+                  <span> Buy</span>
                 ) : (
-                  Accept
+                  <span> Accept</span>
                 )}
-                
+
               </button>
               <button
                 onClick={onCancelOffer}
