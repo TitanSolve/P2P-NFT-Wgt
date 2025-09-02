@@ -84,6 +84,11 @@ const OfferReceivedCard = ({
         // setSendRoomMsg(false);
 
         const data = await response.json();
+
+        console.log(data, "response data");
+
+        setIsLoading(false);
+
         if (data) {
           if (data?.result === "NotEnoughCredit") {
             setMessageBoxType("error");
