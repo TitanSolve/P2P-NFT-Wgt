@@ -5,6 +5,7 @@ import TransactionModal from "../TransactionModal";
 import LoadingOverlayForCard from "../LoadingOverlayForCard";
 import NFTMessageBox from "../NFTMessageBox";
 import { DollarSign, User, X } from "lucide-react";
+import nft_pic from "../../assets/nft.png";
 
 const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -153,7 +154,7 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
             {/* NFT Image */}
             <div className="relative flex-shrink-0">
               <img
-                src={sellOffer.nft.imageURI}
+                src={sellOffer.nft.imageURI || nft_pic}
                 alt={`NFT`}
                 className="w-48 h-48 rounded-2xl object-cover shadow-lg border border-gray-200/50 dark:border-gray-700/50"
               />
