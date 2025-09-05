@@ -88,7 +88,7 @@ const NFTModal = ({
   const [websocketUrl, setWebsocketUrl] = useState("");
   const [transactionStatus, setTransactionStatus] = useState("");
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
-
+  const [createdOfferType, setCreatedOfferType] = useState("create_buy_offer");
   // Messages
   const [isMessageBoxVisible, setIsMessageBoxVisible] = useState(false);
   const [messageBoxType, setMessageBoxType] = useState("success");
@@ -147,6 +147,19 @@ const NFTModal = ({
       // { signed: true|false, reason?: 'DECLINED'|'EXPIRED'..., ... }
       if (msg?.signed === true) {
         closeQrModal("Transaction signed", "Transaction completed successfully!", "success");
+        const requestBody = {
+          account: myWalletAddress,
+          offerType: createdOfferType,
+        };
+        console.log("requestBody for mCredit deduction:", requestBody);
+        const response = fetch(`${API_URLS.backendUrl}/deduct-mCredit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        console.log("deduction result:", response);
         onAction?.(); // refresh data if provided
         return;
       }
@@ -158,7 +171,7 @@ const NFTModal = ({
 
       // Extra guards for alternate shapes
       if (msg?.cancelled || msg?.canceled || msg?.expired) {
-        closeQrModal("Transaction cancelled", /*"Transaction was cancelled/expired."*/ );
+        closeQrModal("Transaction cancelled", /*"Transaction was cancelled/expired."*/);
         return;
       }
     };
@@ -204,6 +217,7 @@ const NFTModal = ({
     };
 
     try {
+      setCreatedOfferType("create_transfer_offer");
       setIsLoading(true);
       const res = await fetch(`${API_URLS.backendUrl}/create-nft-offer`, {
         method: "POST",
@@ -266,6 +280,7 @@ const NFTModal = ({
     };
 
     try {
+      setCreatedOfferType("create_sell_offer");
       setIsLoading(true);
       const res = await fetch(`${API_URLS.backendUrl}/create-nft-offer`, {
         method: "POST",
@@ -301,6 +316,7 @@ const NFTModal = ({
       setIsMessageBoxVisible(true);
       return;
     }
+    setCreatedOfferType("create_buy_offer");
 
     const offerAmount =
       currency === "XRP"
