@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import API_URLS from "../../config";
 import TransactionModal from "../TransactionModal";
@@ -15,6 +15,8 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
   const [isMessageBoxVisible, setIsMessageBoxVisible] = useState(false);
   const [messageBoxType, setMessageBoxType] = useState("success");
   const [messageBoxText, setMessageBoxText] = useState("");
+
+  const wsRef = useRef(null);
 
   async function onRejectTransfer() {
     console.log("onRejectTransfer for item:", transfer);
@@ -64,38 +66,59 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
   }
 
   useEffect(() => {
-    if (websocketUrl) {
-      const ws = new WebSocket(websocketUrl);
+    if (!websocketUrl) return;
 
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log("webSocketData-->", data);
-        if (data.signed) {
-          const requestBody = {
-            account: myWalletAddress,
-            offerType: "accept_transfer_offer",
-          };
-          console.log("requestBody for mCredit deduction:", requestBody);
-          const response = fetch(`${API_URLS.backendUrl}/deduct-mCredit`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(requestBody),
-          });
-          console.log("deduction result:", response);
-          setTransactionStatus("Transaction signed");
-          setIsQrModalVisible(false);
-          onAction();
-        } else if (data.rejected) {
-          setTransactionStatus("Transaction rejected");
-        }
-      };
-      return () => {
-        ws.close();
-      };
+    if (!/^wss?:\/\//i.test(websocketUrl)) {
+      console.error("[WS] Not a websocket URL:", websocketUrl);
+      return;
     }
+
+    if (wsRef.current) {
+      try { wsRef.current.close(1000, "reconnect"); } catch { }
+      wsRef.current = null;
+    }
+
+    const ws = new WebSocket(websocketUrl);
+    wsRef.current = ws;
+
+
+    ws.onopen = () => console.log("[WS] open", websocketUrl);
+    ws.onerror = (e) => console.error("[WS] error", e);
+    ws.onclose = (e) => console.log("[WS] close", e.code, e.reason);
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log("webSocketData-->", data);
+      if (data.signed) {
+        const requestBody = {
+          account: myWalletAddress,
+          offerType: "accept_transfer_offer",
+        };
+        console.log("requestBody for mCredit deduction:", requestBody);
+        const response = fetch(`${API_URLS.backendUrl}/deduct-mCredit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        console.log("deduction result:", response);
+        setTransactionStatus("Transaction signed");
+        setIsQrModalVisible(false);
+        onAction();
+      } else if (data.rejected) {
+        setTransactionStatus("Transaction rejected");
+      }
+    };
+    return () => {
+      if (wsRef.current === ws) {
+        try { ws.close(1000, "unmount"); } catch { }
+        wsRef.current = null;
+      }
+    };
   }, [websocketUrl]);
+
+
 
   return (
     <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6 hover:shadow-xl transition-all duration-300">
