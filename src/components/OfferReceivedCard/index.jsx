@@ -490,17 +490,22 @@ const OfferReceivedCard = ({
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.signed) {
-          // const requestBody = {
-          //   account: myWalletAddress,
-          // };
-          // const response = fetch(`${API_URLS.backendUrl}/deduct-mCredit`, {
-          //   method: "POST",
-          //   headers: {
-          //     "Content-Type": "application/json",
-          //   },
-          //   body: JSON.stringify(requestBody),
-          // });
-          // console.log("deduction result:", response);
+          const requestBody = {
+            account: myWalletAddress,
+            offerType: "accept_transfer_offer",
+          };
+          const response = fetch(
+            `${API_URLS.backendUrl}/deduct-mCredit`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
+            }
+          );
+          console.log("deduction result:", response);
+          
           setTransactionStatus("Transaction signed");
           setIsQrModalVisible(false);
           // onAction(); //refresh
