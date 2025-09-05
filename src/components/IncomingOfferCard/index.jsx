@@ -148,11 +148,14 @@ const IncomingOfferCard = ({
       const ws = new WebSocket(websocketUrl);
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        console.log("WebSocket message received:", data);
         if (data.signed) {
+          console.log("Transaction signed");
           const requestBody = {
             account: myWalletAddress,
             offerType: "accept_transfer_offer",
           };
+          console.log("requestBody for mCredit deduction:", requestBody);
           const response = fetch(
             `${API_URLS.backendUrl}/deduct-mCredit`,
             {
