@@ -72,6 +72,7 @@ const ParticipantCard = ({
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [selectedNftForOffer, setSelectedNftForOffer] = useState(null);
   const [uniqueCurrencies, setUniqueCurrencies] = useState([]);
+  const [createdOfferType, setCreatedOfferType] = useState("create_buy_offer");
   const [websocketUrl, setWebsocketUrl] = useState("");
   const [transactionStatus, setTransactionStatus] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -254,6 +255,7 @@ const ParticipantCard = ({
     if (isSell) {
       if (selectedNftForOffer.userName === wgtParameters.displayName) {
         //Create Sell Offer
+        setCreatedOfferType("create_sell_offer");
         let offerAmount;
         if (state.token === "XRP") {
           offerAmount = state.amount;
@@ -315,6 +317,7 @@ const ParticipantCard = ({
         }
       } //Create Buy Offer
       else {
+        setCreatedOfferType("create_buy_offer");
         let offerAmount;
         if (state.token === "XRP") {
           offerAmount = (parseFloat(state.amount) * 1 + 0.000012).toFixed(6);
@@ -386,7 +389,8 @@ const ParticipantCard = ({
       }
     } else {
       //Create Transfer Offer
-
+      setCreatedOfferType("create_transfer_offer");
+      
       if (destination === "all") {
         setMessageBoxType("error");
         setMessageBoxText("Please select a user to transfer the NFT.");
@@ -447,10 +451,13 @@ const ParticipantCard = ({
         const myName = wgtParameters.displayName;
         const own = membersList.find((u) => u.name === myName /*"This Guy"*/);
         const ownWalletAddress = own?.userId?.split(":")[0].replace("@", "");
+        console.log("data in ws", data);
         if (data.signed === true) {
           const requestBody = {
             account: ownWalletAddress,
+            offerType: createdOfferType,
           };
+          console.log("requestBody for mCredit deduction:", requestBody);
           const response = fetch(`${API_URLS.backendUrl}/deduct-mCredit`, {
             method: "POST",
             headers: {
