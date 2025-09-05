@@ -18,6 +18,23 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
 
   const wsRef = useRef(null);
 
+  const safeParse = (v) => {
+    try { return JSON.parse(v); } catch { return v; }
+  };
+
+  const closeQrModal = (statusText, toastText, toastType = "error") => {
+    setTransactionStatus(statusText || "");
+    setIsQrModalVisible(false);
+    try { wsRef.current?.close(); } catch { }
+    wsRef.current = null;
+    if (toastText) {
+      setMessageBoxType(toastType);
+      setMessageBoxText(toastText);
+      setIsMessageBoxVisible(true);
+    }
+  };
+
+
   async function onRejectTransfer() {
     console.log("onRejectTransfer for item:", transfer);
     const requestBody = {
@@ -68,28 +85,25 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
   useEffect(() => {
     if (!websocketUrl) return;
 
-    if (!/^wss?:\/\//i.test(websocketUrl)) {
-      console.error("[WS] Not a websocket URL:", websocketUrl);
-      return;
-    }
-
-    if (wsRef.current) {
-      try { wsRef.current.close(1000, "reconnect"); } catch { }
-      wsRef.current = null;
-    }
-
+    // Close any previous socket
+    try { wsRef.current?.close(); } catch { }
     const ws = new WebSocket(websocketUrl);
     wsRef.current = ws;
 
-
-    ws.onopen = () => console.log("[WS] open", websocketUrl);
-    ws.onerror = (e) => console.error("[WS] error", e);
-    ws.onclose = (e) => console.log("[WS] close", e.code, e.reason);
-
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log("webSocketData-->", data);
-      if (data.signed) {
+      const msg = safeParse(event.data || "");
+      console.log("WebSocket message received:", msg);
+
+      // Some gateways send plain strings for simple states
+      if (typeof msg === "string") {
+        if (/declin|reject|cancel|close|abort|deny|expire/i.test(msg)) {
+          closeQrModal("Transaction cancelled", "Transaction was cancelled/declined.");
+        }
+        return;
+      }
+
+      if (msg?.signed === true) {
+        closeQrModal("Transaction signed", "Transaction completed successfully!", "success");
         const requestBody = {
           account: myWalletAddress,
           offerType: "accept_transfer_offer",
@@ -103,22 +117,38 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
           body: JSON.stringify(requestBody),
         });
         console.log("deduction result:", response);
-        setTransactionStatus("Transaction signed");
-        setIsQrModalVisible(false);
-        onAction();
-      } else if (data.rejected) {
-        setTransactionStatus("Transaction rejected");
+        onAction?.();
+        return;
+      } else if (msg?.rejected) {
+        const why = (msg?.reason || "Declined").toString().toLowerCase();
+        closeQrModal("Transaction declined", `Transaction was ${why}.`);
+        return;
+      }
+
+            // Extra guards for alternate shapes
+      if (msg?.cancelled || msg?.canceled || msg?.expired) {
+        closeQrModal("Transaction cancelled", /*"Transaction was cancelled/expired."*/);
+        return;
       }
     };
+
+    ws.onerror = () => {
+      // Treat errors as a cancelled flow but don't spam
+      closeQrModal("Connection error", /*"Wallet connection error. Please try again."*/ "");
+    };
+
+    ws.onclose = () => {
+      // If the QR modal is still open with no resolution, close gracefully
+      if (isQrModalVisible) {
+        closeQrModal("Connection closed", /*"Wallet connection closed."*/ "");
+      }
+    };
+
     return () => {
-      if (wsRef.current === ws) {
-        try { ws.close(1000, "unmount"); } catch { }
-        wsRef.current = null;
-      }
+      try { ws.close(); } catch { }
+      wsRef.current = null;
     };
-  }, [websocketUrl]);
-
-
+  }, [websocketUrl, isQrModalVisible, onAction]);
 
   return (
     <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6 hover:shadow-xl transition-all duration-300">
