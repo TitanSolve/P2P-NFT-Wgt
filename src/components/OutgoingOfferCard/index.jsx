@@ -58,7 +58,7 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      setIsQrModalVisible(false);
+      // setIsQrModalVisible(false);
 
       const data = await response.json();
       if (data) {
@@ -84,6 +84,8 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
 
   useEffect(() => {
     if (!websocketUrl) return;
+
+    console.log("Setting up WebSocket connection to:", websocketUrl);
 
     // Close any previous socket
     try { wsRef.current?.close(); } catch { }
