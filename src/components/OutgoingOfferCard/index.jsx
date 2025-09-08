@@ -153,10 +153,10 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
 
     return () => {
       console.log("Cleaning up WebSocket connection");
-      try { ws.close(); } catch { }
+      // try { ws.close(); } catch { }
       wsRef.current = null;
     };
-  }, [websocketUrl, isQrModalVisible, onAction]);
+  }, [websocketUrl/*, isQrModalVisible, onAction*/]);
 
   return (
     <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6 hover:shadow-xl transition-all duration-300">
