@@ -23,6 +23,7 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
   };
 
   const closeQrModal = (statusText, toastText, toastType = "error") => {
+    console.log('closeQRModal', { statusText, toastText, toastType });
     setTransactionStatus(statusText || "");
     setIsQrModalVisible(false);
     try { wsRef.current?.close(); } catch { }
@@ -147,6 +148,7 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
     };
 
     return () => {
+      console.log("Cleaning up WebSocket connection");
       try { ws.close(); } catch { }
       wsRef.current = null;
     };
