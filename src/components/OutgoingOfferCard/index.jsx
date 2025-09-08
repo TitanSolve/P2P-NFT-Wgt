@@ -153,7 +153,7 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
 
     return () => {
       console.log("Cleaning up WebSocket connection");
-      try { ws.close(); } catch { }
+      // try { ws.close(); } catch { }
       wsRef.current = null;
     };
   }, [websocketUrl/*, isQrModalVisible, onAction*/]);
