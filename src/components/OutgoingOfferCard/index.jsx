@@ -85,6 +85,8 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
   useEffect(() => {
     if (!websocketUrl) return;
 
+    console.log("Setting up WebSocket connection to:", websocketUrl);
+
     // Close any previous socket
     try { wsRef.current?.close(); } catch { }
     const ws = new WebSocket(websocketUrl);
