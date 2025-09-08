@@ -137,13 +137,17 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
 
     ws.onerror = () => {
       // Treat errors as a cancelled flow but don't spam
+      console.log("WebSocket error occurred");
       closeQrModal("Connection error", /*"Wallet connection error. Please try again."*/ "");
+      return;
     };
 
     ws.onclose = () => {
       // If the QR modal is still open with no resolution, close gracefully
+      console.log("WebSocket connection closed");
       if (isQrModalVisible) {
         closeQrModal("Connection closed", /*"Wallet connection closed."*/ "");
+        return;
       }
     };
 
