@@ -58,7 +58,7 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      setIsQrModalVisible(false);
+      // setIsQrModalVisible(false);
 
       const data = await response.json();
       if (data) {
