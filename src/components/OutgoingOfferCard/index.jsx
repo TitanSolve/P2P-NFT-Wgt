@@ -1,10 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
 import API_URLS from "../../config";
 import TransactionModal from "../TransactionModal";
-import { Button } from "antd";
 import NFTMessageBox from "../NFTMessageBox";
-import { X, ArrowUp } from "lucide-react";
+import {X} from "lucide-react";
 import nft_pic from "../../assets/nft.png";
 
 const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
