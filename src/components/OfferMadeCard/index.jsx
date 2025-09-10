@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import API_URLS from "../../config";
-import { Button } from "antd";
 import TransactionModal from "../TransactionModal";
 import LoadingOverlayForCard from "../LoadingOverlayForCard";
 import NFTMessageBox from "../NFTMessageBox";
@@ -18,6 +17,25 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
   const [messageBoxText, setMessageBoxText] = useState("");
   const [roomMessage, setRommMessage] = useState("");
   const [sendRoomMsg, setSendRoomMsg] = useState(false);
+
+  const wsRef = useRef(null);
+
+  const safeParse = (v) => {
+    try { return JSON.parse(v); } catch { return v; }
+  };
+
+  const closeQrModal = (statusText, toastText, toastType = "error") => {
+    console.log('closeQRModal', { statusText, toastText, toastType });
+    setTransactionStatus(statusText || "");
+    setIsQrModalVisible(false);
+    try { wsRef.current?.close(); } catch { }
+    wsRef.current = null;
+    if (toastText) {
+      setMessageBoxType(toastType);
+      setMessageBoxText(toastText);
+      setIsMessageBoxVisible(true);
+    }
+  };
 
   useEffect(() => {
     if (sendRoomMsg && roomMessage !== "") {
@@ -124,24 +142,77 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
   }
 
   useEffect(() => {
-    if (websocketUrl) {
-      const ws = new WebSocket(websocketUrl);
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.signed) {
-          setTransactionStatus("Transaction signed");
-          setIsQrModalVisible(false);
-        } else if (data.signed === false) {
-          setIsQrModalVisible(false);
-          ws.close();
-        } else if (data.rejected) {
-          setTransactionStatus("Transaction rejected");
+    if (!websocketUrl) return;
+
+    console.log("Setting up WebSocket connection to:", websocketUrl);
+
+    // Close any previous socket
+    try { wsRef.current?.close(); } catch { }
+    const ws = new WebSocket(websocketUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const msg = safeParse(event.data || "");
+      console.log("WebSocket message received:", msg);
+
+      // Some gateways send plain strings for simple states
+      if (typeof msg === "string") {
+        if (/declin|reject|cancel|close|abort|deny|expire/i.test(msg)) {
+          closeQrModal("Transaction cancelled", "Transaction was cancelled/declined.");
         }
-      };
-      return () => {
-        ws.close();
-      };
-    }
+        return;
+      }
+
+      if (msg?.signed === true) {
+        closeQrModal("Transaction signed", "Transaction completed successfully!", "success");
+        const requestBody = {
+          account: myWalletAddress,
+          offerType: "accept_transfer_offer",
+        };
+        console.log("requestBody for mCredit deduction:", requestBody);
+        const response = fetch(`${API_URLS.backendUrl}/deduct-mCredit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        console.log("deduction result:", response);
+        return;
+      } else if (msg?.rejected) {
+        const why = (msg?.reason || "Declined").toString().toLowerCase();
+        closeQrModal("Transaction declined", `Transaction was ${why}.`);
+        return;
+      }
+
+      // Extra guards for alternate shapes
+      if (msg?.cancelled || msg?.canceled || msg?.expired) {
+        closeQrModal("Transaction cancelled", /*"Transaction was cancelled/expired."*/);
+        return;
+      }
+    };
+
+    ws.onerror = () => {
+      // Treat errors as a cancelled flow but don't spam
+      console.log("WebSocket error occurred");
+      closeQrModal("Connection error", /*"Wallet connection error. Please try again."*/ "");
+      return;
+    };
+
+    ws.onclose = () => {
+      // If the QR modal is still open with no resolution, close gracefully
+      console.log("WebSocket connection closed");
+      if (isQrModalVisible) {
+        closeQrModal("Connection closed", /*"Wallet connection closed."*/ "");
+        return;
+      }
+    };
+
+    return () => {
+      console.log("Cleaning up WebSocket connection");
+      // try { ws.close(); } catch { }
+      wsRef.current = null;
+    };
   }, [websocketUrl]);
 
   return (
