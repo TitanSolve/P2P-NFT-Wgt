@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useState, useRef } from "react";
 import API_URLS from "../../config";
-import { Button } from "antd";
 import TransactionModal from "../TransactionModal";
 import NFTMessageBox from "../NFTMessageBox";
-import { Check, X, ArrowDown } from "lucide-react";
+import { Check, X } from "lucide-react";
 import nft_pic from "../../assets/nft.png";
 
 const IncomingOfferCard = ({
@@ -26,6 +24,25 @@ const IncomingOfferCard = ({
   const [isMessageBoxVisible, setIsMessageBoxVisible] = useState(false);
   const [messageBoxType, setMessageBoxType] = useState("success");
   const [messageBoxText, setMessageBoxText] = useState("");
+
+  const wsRef = useRef(null);
+
+  const safeParse = (v) => {
+    try { return JSON.parse(v); } catch { return v; }
+  };
+
+  const closeQrModal = (statusText, toastText, toastType = "error") => {
+    console.log('closeQRModal', { statusText, toastText, toastType });
+    setTransactionStatus(statusText || "");
+    setIsQrModalVisible(false);
+    try { wsRef.current?.close(); } catch { }
+    wsRef.current = null;
+    if (toastText) {
+      setMessageBoxType(toastType);
+      setMessageBoxText(toastText);
+      setIsMessageBoxVisible(true);
+    }
+  };
 
   useEffect(() => {
     console.log(
@@ -144,55 +161,89 @@ const IncomingOfferCard = ({
   }
 
   useEffect(() => {
-    if (websocketUrl) {
-      const ws = new WebSocket(websocketUrl);
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log("WebSocket message received:", data);
-        if (data.signed) {
-          console.log("Transaction signed");
-          const requestBody = {
-            account: myWalletAddress,
-            offerType: "accept_transfer_offer",
-          };
-          console.log("requestBody for mCredit deduction:", requestBody);
-          const response = fetch(
-            `${API_URLS.backendUrl}/deduct-mCredit`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(requestBody),
-            }
-          );
-          console.log("deduction result:", response);
+    if (!websocketUrl) return;
 
-          setTransactionStatus("Transaction signed");
-          setIsQrModalVisible(false);
-          console.log("pendingOfferAction-->", pendingOfferAction.type);
-          setSendRoomMsg(true);
-          onAction();
-          if (pendingOfferAction.type === "accept") {
-            updateUsersNFTs(
-              transfer.nft.nftokenID,
-              transfer.offer.offerId,
-              myWalletAddress
-            );
-          }
-          setPendingOfferAction(null);
-        } else if (data.signed === false) {
-          setIsQrModalVisible(false);
-          ws.close();
-        } else if (data.rejected) {
-          setTransactionStatus("Transaction rejected");
-          setPendingOfferAction(null);
+    // Close any previous socket
+    try { wsRef.current?.close(); } catch { }
+    const ws = new WebSocket(websocketUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const msg = safeParse(event.data || "");
+      console.log("WebSocket message received:", msg);
+
+      // Some gateways send plain strings for simple states
+      if (typeof msg === "string") {
+        if (/declin|reject|cancel|close|abort|deny|expire/i.test(msg)) {
+          closeQrModal("Transaction cancelled", "Transaction was cancelled/declined.");
         }
-      };
-      return () => {
-        ws.close();
-      };
-    }
+        return;
+      }
+
+      if (msg?.signed === true) {
+        closeQrModal("Transaction signed", "Transaction completed successfully!", "success");
+        console.log("Transaction signed");
+        const requestBody = {
+          account: myWalletAddress,
+          offerType: "accept_transfer_offer",
+        };
+        console.log("requestBody for mCredit deduction:", requestBody);
+        const response = fetch(
+          `${API_URLS.backendUrl}/deduct-mCredit`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+        console.log("deduction result:", response);
+
+        onAction();
+        if (pendingOfferAction.type === "accept") {
+          updateUsersNFTs(
+            transfer.nft.nftokenID,
+            transfer.offer.offerId,
+            myWalletAddress
+          );
+        }
+        setPendingOfferAction(null);
+        return;
+      } else if (msg?.rejected) {
+        const why = (msg?.reason || "Declined").toString().toLowerCase();
+        closeQrModal("Transaction declined", `Transaction was ${why}.`);
+        return;
+      }
+      // Extra guards for alternate shapes
+      if (msg?.cancelled || msg?.canceled || msg?.expired) {
+        closeQrModal("Transaction cancelled", /*"Transaction was cancelled/expired."*/);
+        return;
+      }
+    };
+
+    ws.onerror = () => {
+      // Treat errors as a cancelled flow but don't spam
+      console.log("WebSocket error occurred");
+      closeQrModal("Connection error", /*"Wallet connection error. Please try again."*/ "");
+      return;
+    };
+
+    ws.onclose = () => {
+      // If the QR modal is still open with no resolution, close gracefully
+      console.log("WebSocket connection closed");
+      if (isQrModalVisible) {
+        closeQrModal("Connection closed", /*"Wallet connection closed."*/ "");
+        return;
+      }
+    };
+
+    return () => {
+      console.log("Cleaning up WebSocket connection");
+      // try { ws.close(); } catch { }
+      wsRef.current = null;
+    };
+    
   }, [websocketUrl]);
 
   return (

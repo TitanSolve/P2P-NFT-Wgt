@@ -120,7 +120,7 @@ const OutgoingOfferCard = ({ transfer, index, onAction, myWalletAddress }) => {
           body: JSON.stringify(requestBody),
         });
         console.log("deduction result:", response);
-        onAction?.();
+        // onAction?.();
         return;
       } else if (msg?.rejected) {
         const why = (msg?.reason || "Declined").toString().toLowerCase();
