@@ -177,6 +177,7 @@ const OfferMadeCard = ({ sellOffer, index, onAction, myWalletAddress }) => {
           },
           body: JSON.stringify(requestBody),
         });
+        onAction();
         console.log("deduction result:", response);
         return;
       } else if (msg?.rejected) {
